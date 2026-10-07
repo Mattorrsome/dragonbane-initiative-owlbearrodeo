@@ -10,6 +10,11 @@ export interface Participant {
   initiativeCard: number | null;
   status: ParticipantStatus;
   controlledBy: string; // Player ID or "GM"
+  previousCard: number | null; // card held at the end of the last round
+  lightningFast: boolean; // draws two cards, keeps one
+  surprise: boolean; // picks a card before anyone else draws (round 1)
+  retainNext: boolean; // Veteran: keep final card into the next round
+  pendingCards: [number, number] | null; // reserved Lightning Fast pair
 }
 
 export interface CombatState {
@@ -18,7 +23,9 @@ export interface CombatState {
   roundNumber: number;
   participants: Participant[];
   currentTurnIndex: number;
-  drawnCards: number[];
+  drawnCards: number[]; // every taken card, incl. reserved pairs and kept cards
+  deckSize: number;
+  lastDraw: { participantId: string; card: number } | null;
 }
 
 export const INITIAL_COMBAT_STATE: CombatState = {
@@ -28,6 +35,8 @@ export const INITIAL_COMBAT_STATE: CombatState = {
   participants: [],
   currentTurnIndex: 0,
   drawnCards: [],
+  deckSize: 10,
+  lastDraw: null,
 };
 
 export const METADATA_KEY = "com.dragonbane-initiative/combat-state";
