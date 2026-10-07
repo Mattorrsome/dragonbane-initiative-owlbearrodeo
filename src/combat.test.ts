@@ -324,3 +324,152 @@ describe("drawing", () => {
     expect(r.participants[1].initiativeCard).toBe(1);
   });
 });
+
+describe("Lightning Fast", () => {
+  const lf = (extra: Participant[] = [], over: Partial<CombatState> = {}) =>
+    mkS([mkP("a", { lightningFast: true }), ...extra], over);
+
+  it("drawTwo reserves two distinct cards", () => {
+    const r = c.drawTwo(lf(), { id: "a" }, GM).state;
+    expect(r.participants[0].pendingCards).toEqual([1, 2]);
+    expect(r.participants[0].initiativeCard).toBeNull();
+    expect(r.drawnCards).toEqual([1, 2]);
+  });
+
+  it("chooseOne keeps one card and releases the other", () => {
+    const s = c.drawTwo(lf(), { id: "a" }, GM).state;
+    const r = c.chooseOne(s, { id: "a", card: 2 }, GM).state;
+    expect(r.participants[0]).toMatchObject({ initiativeCard: 2, pendingCards: null });
+    expect(r.drawnCards).toEqual([2]);
+    expect(r.lastDraw).toEqual({ participantId: "a", card: 2 });
+  });
+
+  it("chooseOne rejects a card outside the pair and a non-controller", () => {
+    const s = c.drawTwo(lf(), { id: "a" }, GM).state;
+    expect(c.chooseOne(s, { id: "a", card: 3 }, GM).state).toBe(s);
+    expect(c.chooseOne(s, { id: "a", card: 1 }, P1).state).toBe(s);
+  });
+
+  it("drawCard rejects an LF participant and drawAll skips them", () => {
+    const s = lf([mkP("b")]);
+    expect(c.drawCard(s, { id: "a" }, GM).error).toBeDefined();
+    const r = c.drawAll(s, GM).state;
+    expect(r.participants[0]).toMatchObject({ initiativeCard: null, pendingCards: null });
+    expect(r.participants[1].initiativeCard).toBe(1);
+  });
+
+  it("drawTwo rejects when it would leave others without a card", () => {
+    const ps = Array.from({ length: 20 }, (_, i) => mkP(String(i), i === 0 ? { lightningFast: true } : {}));
+    const s = mkS(ps); // deck capped at 20, LF needs 21
+    expect(s.deckSize).toBe(20);
+    const r = c.drawTwo(s, { id: "0" }, GM);
+    expect(r.error).toMatch(/not enough/i);
+    expect(r.state).toBe(s);
+    const ten = mkS(ps.slice(0, 10)); // 10 participants + 1 LF -> deck 11
+    expect(ten.deckSize).toBe(11);
+    expect(c.drawTwo(ten, { id: "0" }, GM).error).toBeUndefined();
+  });
+
+  it("drawAll leaving one card makes drawTwo reject instead of looping", () => {
+    const ps = Array.from({ length: 20 }, (_, i) => mkP(String(i), i === 0 ? { lightningFast: true } : {}));
+    const after = c.drawAll(mkS(ps), GM).state;
+    expect(c.drawTwo(after, { id: "0" }, GM).error).toBeDefined();
+  });
+
+  it("setLightningFast grows the deck by one card per LF participant", () => {
+    const s = mkS(Array.from({ length: 10 }, (_, i) => mkP(String(i))));
+    expect(s.deckSize).toBe(10);
+    const r = c.setLightningFast(s, { id: "0", value: true }, GM).state;
+    expect(r.deckSize).toBe(11);
+  });
+
+  it("setLightningFast: controller or GM, before a card is held", () => {
+    const s = mkS([mkP("a", { controlledBy: "p1" }), mkP("b")]);
+    expect(c.setLightningFast(s, { id: "a", value: true }, P1).state.participants[0].lightningFast).toBe(true);
+    expect(c.setLightningFast(s, { id: "b", value: true }, P1).error).toBeDefined();
+    const held = mkS([mkP("a", { initiativeCard: 3 })]);
+    expect(c.setLightningFast(held, { id: "a", value: true }, GM).state).toBe(held);
+  });
+});
+
+describe("Surprise", () => {
+  it("setSurprise is GM only and round 1 only", () => {
+    const s = mkS([mkP("a")]);
+    expect(c.setSurprise(s, { id: "a", value: true }, GM).state.participants[0].surprise).toBe(true);
+    expect(c.setSurprise(s, { id: "a", value: true }, P1).error).toBeDefined();
+    const r2 = mkS([mkP("a")], { roundNumber: 2 });
+    expect(c.setSurprise(r2, { id: "a", value: true }, GM).state).toBe(r2);
+  });
+
+  it("blocks other draws until the surprise participant picks", () => {
+    let s = mkS([mkP("a", { surprise: true }), mkP("b")]);
+    expect(c.drawCard(s, { id: "b" }, GM).error).toMatch(/surprise/i);
+    expect(c.drawAll(s, GM).error).toMatch(/surprise/i);
+    expect(c.drawCard(s, { id: "a" }, GM).error).toBeDefined();
+    s = c.pickSurpriseCard(s, { id: "a", card: 7 }, GM).state;
+    expect(s.participants[0].initiativeCard).toBe(7);
+    expect(s.drawnCards).toEqual([7]);
+    expect(s.lastDraw).toEqual({ participantId: "a", card: 7 });
+    expect(c.drawCard(s, { id: "b" }, GM).state.participants[1].initiativeCard).toBe(1);
+  });
+
+  it("pickSurpriseCard rejects taken, out-of-range and non-surprise picks", () => {
+    const s = mkS([mkP("a", { surprise: true }), mkP("b", { initiativeCard: 3 }), mkP("c")]);
+    expect(c.pickSurpriseCard(s, { id: "a", card: 3 }, GM).error).toBeDefined();
+    expect(c.pickSurpriseCard(s, { id: "a", card: 11 }, GM).error).toBeDefined();
+    expect(c.pickSurpriseCard(s, { id: "c", card: 5 }, GM).error).toBeDefined();
+  });
+});
+
+describe("Keep card and newRound", () => {
+  const complete = (ps: Participant[], over: Partial<CombatState> = {}) =>
+    mkS(ps, { phase: "ROUND_COMPLETE", ...over });
+
+  it("setRetainNext works for the controller in any phase, not for others", () => {
+    const s = complete([mkP("a", { controlledBy: "p1", initiativeCard: 2 }), mkP("b", { initiativeCard: 3 })]);
+    expect(c.setRetainNext(s, { id: "a", value: true }, P1).state.participants[0].retainNext).toBe(true);
+    expect(c.setRetainNext(s, { id: "b", value: true }, P1).error).toBeDefined();
+  });
+
+  it("newRound keeps flagged cards, records previousCard and clears one-round flags", () => {
+    const s = complete([
+      mkP("a", { initiativeCard: 4, retainNext: true, status: "ACTED" }),
+      mkP("b", { initiativeCard: 2, surprise: true, status: "ACTED" }),
+    ]);
+    const r = c.newRound(s, GM).state;
+    expect(r.phase).toBe("DRAWING");
+    expect(r.roundNumber).toBe(2);
+    expect(r.drawnCards).toEqual([4]);
+    expect(r.participants[0]).toMatchObject({ initiativeCard: 4, previousCard: 4, status: "PENDING", retainNext: false });
+    expect(r.participants[1]).toMatchObject({ initiativeCard: null, previousCard: 2, surprise: false });
+    expect(r.lastDraw).toBeNull();
+  });
+
+  it("a kept card is never drawn again", () => {
+    const s = complete([
+      mkP("a", { initiativeCard: 1, retainNext: true }),
+      mkP("b", { initiativeCard: 2 }),
+    ]);
+    const r = c.newRound(s, GM).state;
+    expect(c.drawCard(r, { id: "b" }, GM).state.participants[1].initiativeCard).toBe(2);
+  });
+
+  it("a kept card above a shrunk deck stays reserved", () => {
+    const s = complete(
+      [mkP("a", { initiativeCard: 13, retainNext: true }), mkP("b", { initiativeCard: 1 })],
+      { deckSize: 14 }
+    );
+    const r = c.newRound(s, GM).state;
+    expect(r.deckSize).toBe(13);
+    expect(r.drawnCards).toEqual([13]);
+  });
+
+  it("newRound recomputes deck size, is GM only and needs a finished round", () => {
+    const ps = Array.from({ length: 12 }, (_, i) => mkP("p" + i, { initiativeCard: i + 1 }));
+    expect(c.newRound(complete(ps), GM).state.deckSize).toBe(12);
+    const s = complete(ps);
+    expect(c.newRound(s, P1).state).toBe(s);
+    const active = mkS(ps, { phase: "ACTIVE" });
+    expect(c.newRound(active, GM).state).toBe(active);
+  });
+});

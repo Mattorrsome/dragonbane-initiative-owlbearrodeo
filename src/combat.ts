@@ -351,3 +351,125 @@ export function drawAll(s: CombatState, ctx: Ctx): Result {
   if (!changed) return reject(s, "Nobody left to draw for");
   return ok({ ...s, participants, drawnCards: drawn, lastDraw: null });
 }
+
+const unheld = (p: Participant): boolean => p.initiativeCard === null && !p.pendingCards;
+
+export function setLightningFast(
+  s: CombatState,
+  a: { id: string; value: boolean },
+  ctx: Ctx
+): Result {
+  const p = findP(s, a.id);
+  if (!p) return reject(s, "Participant not found");
+  if (!canControl(p, ctx)) return reject(s, "You don't control that participant");
+  if (s.phase !== "DRAWING" || !unheld(p))
+    return reject(s, "Lightning Fast can only change before drawing");
+  const next = mapP(s, a.id, (x) => ({ ...x, lightningFast: a.value }));
+  if (a.value && deckSizeOf(next.participants) > MAX_PARTICIPANTS)
+    return reject(s, "Deck is full");
+  return ok({ ...next, deckSize: Math.max(next.deckSize, deckSizeOf(next.participants)) });
+}
+
+export function drawTwo(s: CombatState, a: { id: string }, ctx: Ctx): Result {
+  const p = findP(s, a.id);
+  const block = drawBlock(s, p, ctx);
+  if (block || !p) return reject(s, block ?? "Participant not found");
+  if (!p.lightningFast) return reject(s, "Lightning Fast is off");
+  if (p.surprise) return reject(s, "Pick a card for Surprise");
+  if (waitingOnSurprise(s)) return reject(s, "Waiting for surprise picks");
+  const free = freeCards(s);
+  const othersUndrawn = s.participants.filter((o) => o.id !== a.id && unheld(o)).length;
+  if (free.length - 2 < othersUndrawn)
+    return reject(s, "Not enough cards left for Lightning Fast");
+  const first = pick(free, ctx);
+  const second = pick(
+    free.filter((card) => card !== first),
+    ctx
+  );
+  return ok({
+    ...mapP(s, a.id, (x) => ({ ...x, pendingCards: [first, second] as [number, number] })),
+    drawnCards: [...s.drawnCards, first, second],
+  });
+}
+
+export function chooseOne(s: CombatState, a: { id: string; card: number }, ctx: Ctx): Result {
+  const p = findP(s, a.id);
+  if (!p || !p.pendingCards) return reject(s, "Nothing to choose");
+  if (!canControl(p, ctx)) return reject(s, "You don't control that participant");
+  if (!p.pendingCards.includes(a.card)) return reject(s, "Pick one of the two drawn cards");
+  const other = p.pendingCards[0] === a.card ? p.pendingCards[1] : p.pendingCards[0];
+  return ok({
+    ...mapP(s, a.id, (x) => ({ ...x, initiativeCard: a.card, pendingCards: null })),
+    drawnCards: s.drawnCards.filter((card) => card !== other),
+    lastDraw: { participantId: a.id, card: a.card },
+  });
+}
+
+export function setSurprise(
+  s: CombatState,
+  a: { id: string; value: boolean },
+  ctx: Ctx
+): Result {
+  const denied = gmOnly(s, ctx, "set Surprise");
+  if (denied) return denied;
+  const p = findP(s, a.id);
+  if (!p) return reject(s, "Participant not found");
+  if (s.roundNumber !== 1) return reject(s, "Surprise only applies in round 1");
+  if (s.phase !== "DRAWING" || !unheld(p))
+    return reject(s, "Surprise can only change before drawing");
+  return ok(mapP(s, a.id, (x) => ({ ...x, surprise: a.value })));
+}
+
+export function pickSurpriseCard(
+  s: CombatState,
+  a: { id: string; card: number },
+  ctx: Ctx
+): Result {
+  const p = findP(s, a.id);
+  const block = drawBlock(s, p, ctx);
+  if (block || !p) return reject(s, block ?? "Participant not found");
+  if (!p.surprise) return reject(s, "Not a Surprise participant");
+  if (!freeCards(s).includes(a.card)) return reject(s, "That card isn't available");
+  return ok({
+    ...mapP(s, a.id, (x) => ({ ...x, initiativeCard: a.card })),
+    drawnCards: [...s.drawnCards, a.card],
+    lastDraw: { participantId: a.id, card: a.card },
+  });
+}
+
+export function setRetainNext(
+  s: CombatState,
+  a: { id: string; value: boolean },
+  ctx: Ctx
+): Result {
+  const p = findP(s, a.id);
+  if (!p) return reject(s, "Participant not found");
+  if (!canControl(p, ctx)) return reject(s, "You don't control that participant");
+  return ok(mapP(s, a.id, (x) => ({ ...x, retainNext: a.value })));
+}
+
+export function newRound(s: CombatState, ctx: Ctx): Result {
+  const denied = gmOnly(s, ctx, "start a new round");
+  if (denied) return denied;
+  if (s.phase !== "ROUND_COMPLETE") return reject(s, "The round isn't complete");
+  const participants = s.participants.map((p) => ({
+    ...p,
+    previousCard: p.initiativeCard,
+    initiativeCard: p.retainNext ? p.initiativeCard : null,
+    status: "PENDING" as const,
+    retainNext: false,
+    surprise: false,
+    pendingCards: null,
+  }));
+  const drawnCards = participants.flatMap((p) => (p.initiativeCard === null ? [] : [p.initiativeCard]));
+  return ok({
+    ...s,
+    phase: "DRAWING",
+    roundNumber: s.roundNumber + 1,
+    participants,
+    currentTurnIndex: 0,
+    drawnCards,
+    deckSize: Math.max(deckSizeOf(participants), ...drawnCards),
+    lastDraw: null,
+  });
+}
