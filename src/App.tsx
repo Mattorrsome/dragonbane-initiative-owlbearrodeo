@@ -85,6 +85,7 @@ function App() {
 
     let sceneReady = false;
     let prevIds = new Set<string>();
+    let queue: Promise<unknown> = Promise.resolve(); // serialize dispatches (no concurrent read-modify-write)
     let gen = 0; // bumped on every scene change/cleanup so stale async results are dropped
     const gmCtx: Ctx = { role: "GM", playerId };
 
@@ -118,11 +119,18 @@ function App() {
       if (!sceneReady) return;
       const current = new Set(items.map((i) => i.id));
       const gone = [...prevIds].filter((id) => !current.has(id));
+      // Scene teardown can emit an empty/new list before onReadyChange(false): if every
+      // previously seen id vanished at once, treat it as a scene swap, not deletions.
+      const swap = prevIds.size > 0 && gone.length === prevIds.size;
       prevIds = current;
-      if (gone.length === 0) return;
-      dispatch((s) =>
-        combat.removeParticipants(s, { ids: combat.participantIdsForTokens(s, gone) }, gmCtx)
-      ).catch(console.error);
+      if (gone.length === 0 || swap) return;
+      queue = queue
+        .then(() =>
+          dispatch((s) =>
+            combat.removeParticipants(s, { ids: combat.participantIdsForTokens(s, gone) }, gmCtx)
+          )
+        )
+        .catch(console.error);
     });
 
     return () => {
@@ -203,6 +211,18 @@ function App() {
 
   const [gmSwapFirst, setGmSwapFirst] = useState<string | null>(null);
 
+  // Drop stale swap selections when the table changes underneath them.
+  useEffect(() => {
+    setGmSwapFirst(null);
+  }, [combatState.phase, combatState.roundNumber, combatState.participants.length]);
+  useEffect(() => {
+    setGmSwapFirst((f) => (f !== null && combatState.participants.some((p) => p.id === f) ? f : null));
+  }, [combatState.participants]);
+  const activeId = combat.activeParticipant(combatState)?.id;
+  useEffect(() => {
+    setSwappingFrom(null);
+  }, [activeId, combatState.phase]);
+
   const setLightningFast = (id: string, value: boolean) =>
     run((s, c) => combat.setLightningFast(s, { id, value }, c));
   const setSurprise = (id: string, value: boolean) =>
@@ -262,9 +282,7 @@ function App() {
   const displayParticipants =
     combatState.phase === "DRAWING"
       ? combatState.participants
-      : sorted.length > 0
-      ? sorted
-      : combatState.participants;
+      : [...sorted, ...combatState.participants.filter((p) => p.initiativeCard === null)];
 
   return (
     <div className={`app ${theme.toLowerCase()}`}>
