@@ -1,11 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
-import OBR, { Item, Player } from "@owlbear-rodeo/sdk";
-import {
-  CombatState,
-  Participant,
-  INITIAL_COMBAT_STATE,
-  METADATA_KEY,
-} from "./types";
+import OBR, { Player } from "@owlbear-rodeo/sdk";
+import { CombatState, Participant, INITIAL_COMBAT_STATE, METADATA_KEY } from "./types";
+import * as combat from "./combat";
+import type { Ctx, Result } from "./combat";
 
 type Role = "GM" | "PLAYER";
 type Theme = "DARK" | "LIGHT";
@@ -20,6 +17,28 @@ function App() {
   const [partyPlayers, setPartyPlayers] = useState<Player[]>([]);
   const [editingNameId, setEditingNameId] = useState<string | null>(null);
   const [editingNameValue, setEditingNameValue] = useState("");
+
+  const ctx: Ctx = { role, playerId };
+
+  // Re-read metadata, apply the reducer to the fresh state, write. Not atomic, but the
+  // read-modify-write window is milliseconds instead of "whatever this client last saw".
+  const dispatch = useCallback(
+    async (reducer: (s: CombatState) => Result): Promise<boolean> => {
+      const metadata = await OBR.room.getMetadata();
+      const current = combat.normalizeState(metadata[METADATA_KEY]);
+      const { state, error, notice } = reducer(current);
+      if (error) {
+        await OBR.notification.show(error, "WARNING");
+        return false;
+      }
+      if (state !== current) await OBR.room.setMetadata({ [METADATA_KEY]: state });
+      if (notice) await OBR.notification.show(notice);
+      return true;
+    },
+    []
+  );
+  const run = (reducer: (s: CombatState, c: Ctx) => Result) =>
+    dispatch((s) => reducer(s, ctx));
 
   // Initialize OBR SDK
   useEffect(() => {
@@ -36,12 +55,8 @@ function App() {
       setPartyPlayers(players);
       setIsReady(true);
 
-      // Load initial combat state
       const metadata = await OBR.room.getMetadata();
-      const savedState = metadata[METADATA_KEY] as CombatState | undefined;
-      if (savedState) {
-        setCombatState(savedState);
-      }
+      setCombatState(combat.normalizeState(metadata[METADATA_KEY]));
     });
   }, []);
 
@@ -50,14 +65,8 @@ function App() {
     if (!isReady) return;
 
     const unsubMetadata = OBR.room.onMetadataChange((metadata) => {
-      const state = metadata[METADATA_KEY] as CombatState | undefined;
-      if (state) {
-        setCombatState(state);
-      } else {
-        setCombatState(INITIAL_COMBAT_STATE);
-      }
+      setCombatState(combat.normalizeState(metadata[METADATA_KEY]));
     });
-
     const unsubTheme = OBR.theme.onChange((t) => setTheme(t.mode));
     const unsubParty = OBR.party.onChange((p) => setPartyPlayers(p));
 
@@ -68,99 +77,58 @@ function App() {
     };
   }, [isReady]);
 
-  // Watch for token deletions
+  // Watch for deleted tokens (GM client only, created once, independent of combat state).
+  // A token only counts as deleted if we saw it in the scene and it is now gone, so a
+  // scene switch (items briefly empty or from another scene) never removes anyone.
   useEffect(() => {
-    if (!isReady || !combatState.isActive) return;
+    if (!isReady || role !== "GM") return;
 
-    const unsubscribe = OBR.scene.items.onChange(async (items) => {
-      const itemIds = new Set(items.map((i) => i.id));
-      const removedParticipants = combatState.participants.filter(
-        (p) => !itemIds.has(p.tokenId)
-      );
+    let sceneReady = false;
+    let prevIds = new Set<string>();
+    const gmCtx: Ctx = { role: "GM", playerId };
 
-      if (removedParticipants.length > 0) {
-        const newParticipants = combatState.participants.filter((p) =>
-          itemIds.has(p.tokenId)
-        );
+    const seed = async () => {
+      const items = await OBR.scene.items.getItems();
+      prevIds = new Set(items.map((i) => i.id));
+    };
 
-        // Adjust current turn index if needed
-        let newTurnIndex = combatState.currentTurnIndex;
-        const sortedOld = getSortedParticipants(combatState.participants);
-        const activeId = sortedOld[combatState.currentTurnIndex]?.id;
-
-        if (activeId) {
-          const sortedNew = getSortedParticipants(newParticipants);
-          const newIndex = sortedNew.findIndex((p) => p.id === activeId);
-          if (newIndex === -1) {
-            // Active participant was removed, keep index but clamp
-            newTurnIndex = Math.min(newTurnIndex, sortedNew.length - 1);
-          } else {
-            newTurnIndex = newIndex;
-          }
-        }
-
-        await updateCombatState({
-          ...combatState,
-          participants: newParticipants,
-          currentTurnIndex: Math.max(0, newTurnIndex),
-        });
-
-        for (const p of removedParticipants) {
-          await OBR.notification.show(`${p.name} was removed from combat`);
-        }
-      }
+    OBR.scene.isReady().then(async (ready) => {
+      sceneReady = ready;
+      if (ready) await seed();
     });
 
-    return () => unsubscribe();
-  }, [isReady, combatState]);
+    const unsubReady = OBR.scene.onReadyChange(async (ready) => {
+      sceneReady = ready;
+      prevIds = new Set();
+      if (ready) await seed();
+    });
 
-  // Helper to update combat state
-  const updateCombatState = useCallback(async (newState: CombatState) => {
-    await OBR.room.setMetadata({ [METADATA_KEY]: newState });
-  }, []);
+    const unsubItems = OBR.scene.items.onChange((items) => {
+      if (!sceneReady) return;
+      const current = new Set(items.map((i) => i.id));
+      const gone = [...prevIds].filter((id) => !current.has(id));
+      prevIds = current;
+      if (gone.length === 0) return;
+      dispatch((s) =>
+        combat.removeParticipants(s, { ids: combat.participantIdsForTokens(s, gone) }, gmCtx)
+      );
+    });
 
-  // Get sorted participants by initiative
-  const getSortedParticipants = (participants: Participant[]): Participant[] => {
-    return [...participants]
-      .filter((p) => p.initiativeCard !== null)
-      .sort((a, b) => (a.initiativeCard ?? 0) - (b.initiativeCard ?? 0));
-  };
+    return () => {
+      unsubReady();
+      unsubItems();
+    };
+  }, [isReady, role, playerId, dispatch]);
 
-  // Check if current player can control a participant
-  const canControl = (participant: Participant): boolean => {
-    if (role === "GM") return true;
-    return participant.controlledBy === playerId;
-  };
-
-  // Get display name for a participant
-  const getDisplayName = (participant: Participant): string => {
-    return participant.customName || participant.name;
-  };
-
-  // Save a custom name for a participant
-  const saveCustomName = async (participantId: string, newName: string) => {
-    const trimmed = newName.trim();
-    const newParticipants = combatState.participants.map((p) =>
-      p.id === participantId
-        ? { ...p, customName: trimmed.length > 0 ? trimmed : null }
-        : p
-    );
-    await updateCombatState({ ...combatState, participants: newParticipants });
-    setEditingNameId(null);
-  };
-
-  // Draw a random card from available pool
-  const drawRandomCard = (): number => {
-    const available = [];
-    for (let i = 1; i <= 10; i++) {
-      if (!combatState.drawnCards.includes(i)) {
-        available.push(i);
-      }
-    }
-    return available[Math.floor(Math.random() * available.length)];
-  };
+  const canControl = (participant: Participant): boolean => combat.canControl(participant, ctx);
+  const getDisplayName = combat.displayName;
 
   // === ACTIONS ===
+
+  const saveCustomName = async (participantId: string, newName: string) => {
+    await run((s, c) => combat.setCustomName(s, { id: participantId, name: newName }, c));
+    setEditingNameId(null);
+  };
 
   const startCombat = async () => {
     const selection = await OBR.player.getSelection();
@@ -168,262 +136,46 @@ function App() {
       await OBR.notification.show("Select tokens to add to combat", "WARNING");
       return;
     }
-
     const items = await OBR.scene.items.getItems(selection);
-    const allPlayerIds = partyPlayers.map((p) => p.id);
-
-    const participants: Participant[] = items.map((item: Item) => {
-      // Check if token's creator is a player in the party
-      const creatorId = item.createdUserId;
-      const isPlayerOwned = creatorId && allPlayerIds.includes(creatorId);
-
-      // Resolve player display name for player-owned tokens
-      let displayName = item.name || "Unknown";
-      if (isPlayerOwned) {
-        const player = partyPlayers.find((p) => p.id === creatorId);
-        if (player?.name) displayName = player.name;
-      }
-
-      return {
-        id: crypto.randomUUID(),
-        tokenId: item.id,
-        name: displayName,
-        customName: null,
-        initiativeCard: null,
-        status: "PENDING",
-        controlledBy: isPlayerOwned ? creatorId : "GM",
-      };
-    });
-
-    await updateCombatState({
-      isActive: true,
-      phase: "DRAWING",
-      roundNumber: 1,
-      participants,
-      currentTurnIndex: 0,
-      drawnCards: [],
-    });
-
-    await OBR.notification.show("Combat started!");
+    const participants = combat.buildParticipants(items, partyPlayers);
+    await run((s, c) => combat.startCombat(s, { participants }, c));
   };
 
-  const drawCard = async (participantId: string) => {
-    const participant = combatState.participants.find((p) => p.id === participantId);
-    if (!participant || participant.initiativeCard !== null) return;
-
-    const card = drawRandomCard();
-    const newParticipants = combatState.participants.map((p) =>
-      p.id === participantId ? { ...p, initiativeCard: card } : p
+  const drawCard = (participantId: string) => {
+    const p = combatState.participants.find((x) => x.id === participantId);
+    return run((s, c) =>
+      p?.lightningFast
+        ? combat.drawTwo(s, { id: participantId }, c)
+        : combat.drawCard(s, { id: participantId }, c)
     );
-
-    await updateCombatState({
-      ...combatState,
-      participants: newParticipants,
-      drawnCards: [...combatState.drawnCards, card],
-    });
   };
 
-  const drawAllCards = async () => {
-    const newParticipants = [...combatState.participants];
-    const newDrawnCards = [...combatState.drawnCards];
+  const drawAllCards = () => run((s, c) => combat.drawAll(s, c));
+  const startRound = () => run((s, c) => combat.startRound(s, c));
+  const act = () => run((s, c) => combat.act(s, c));
+  const newRound = () => run((s, c) => combat.newRound(s, c));
 
-    for (const p of newParticipants) {
-      if (p.initiativeCard === null) {
-        const available = [];
-        for (let i = 1; i <= 10; i++) {
-          if (!newDrawnCards.includes(i)) {
-            available.push(i);
-          }
-        }
-        const card = available[Math.floor(Math.random() * available.length)];
-        p.initiativeCard = card;
-        newDrawnCards.push(card);
-      }
-    }
-
-    await updateCombatState({
-      ...combatState,
-      participants: newParticipants,
-      drawnCards: newDrawnCards,
-    });
-  };
-
-  const startRound = async () => {
-    const sorted = getSortedParticipants(combatState.participants);
-    const newParticipants = combatState.participants.map((p) => ({
-      ...p,
-      status: sorted[0]?.id === p.id ? "ACTIVE" : "PENDING",
-    })) as Participant[];
-
-    await updateCombatState({
-      ...combatState,
-      phase: "ACTIVE",
-      participants: newParticipants,
-      currentTurnIndex: 0,
-    });
-  };
-
-  const act = async () => {
-    const sorted = getSortedParticipants(combatState.participants);
-    const current = sorted[combatState.currentTurnIndex];
-    if (!current) return;
-
-    const nextIndex = combatState.currentTurnIndex + 1;
-    const isRoundComplete = nextIndex >= sorted.length;
-
-    const newParticipants = combatState.participants.map((p) => {
-      if (p.id === current.id) {
-        return { ...p, status: "ACTED" as const };
-      }
-      if (!isRoundComplete && sorted[nextIndex]?.id === p.id) {
-        return { ...p, status: "ACTIVE" as const };
-      }
-      return p;
-    });
-
-    await updateCombatState({
-      ...combatState,
-      phase: isRoundComplete ? "ROUND_COMPLETE" : "ACTIVE",
-      participants: newParticipants,
-      currentTurnIndex: isRoundComplete ? 0 : nextIndex,
-    });
-  };
-
-  const initiateSwap = (participantId: string) => {
-    setSwappingFrom(participantId);
-  };
-
-  const cancelSwap = () => {
-    setSwappingFrom(null);
-  };
+  const initiateSwap = (participantId: string) => setSwappingFrom(participantId);
+  const cancelSwap = () => setSwappingFrom(null);
 
   const executeSwap = async (targetId: string) => {
-    const sorted = getSortedParticipants(combatState.participants);
-    const swapper = sorted.find((p) => p.id === swappingFrom);
-    const target = sorted.find((p) => p.id === targetId);
-
-    if (!swapper || !target) return;
-
-    // Exchange cards - swapper gets higher, target gets lower
-    const swapperCard = swapper.initiativeCard!;
-    const targetCard = target.initiativeCard!;
-
-    const newParticipants = combatState.participants.map((p) => {
-      if (p.id === swapper.id) {
-        return {
-          ...p,
-          initiativeCard: targetCard,
-          status: "WAITED" as const,
-        };
-      }
-      if (p.id === target.id) {
-        return {
-          ...p,
-          initiativeCard: swapperCard,
-          status: "ACTIVE" as const,
-        };
-      }
-      return p;
-    });
-
-    // Find new turn index after swap
-    const newSorted = getSortedParticipants(newParticipants);
-    const newTurnIndex = newSorted.findIndex((p) => p.status === "ACTIVE");
-
-    await updateCombatState({
-      ...combatState,
-      participants: newParticipants,
-      currentTurnIndex: newTurnIndex >= 0 ? newTurnIndex : 0,
-    });
-
+    await run((s, c) => combat.swap(s, { targetId }, c));
     setSwappingFrom(null);
   };
 
-  const getValidSwapTargets = (): Participant[] => {
-    const sorted = getSortedParticipants(combatState.participants);
-    const current = sorted[combatState.currentTurnIndex];
-    if (!current) return [];
-
-    return sorted.filter(
-      (p) =>
-        p.id !== current.id &&
-        p.status !== "ACTED" &&
-        p.status !== "WAITED" &&
-        (p.initiativeCard ?? 0) > (current.initiativeCard ?? 0)
+  const addFerocity = (participantId: string) =>
+    run((s, c) =>
+      combat.addFerocity(s, { id: participantId, newId: crypto.randomUUID() }, c)
     );
-  };
 
-  const addFerocity = async (participantId: string) => {
-    const participant = combatState.participants.find((p) => p.id === participantId);
-    if (!participant) return;
-
-    const duplicate: Participant = {
-      id: crypto.randomUUID(),
-      tokenId: participant.tokenId,
-      name: participant.name,
-      customName: participant.customName,
-      initiativeCard: null,
-      status: "PENDING",
-      controlledBy: participant.controlledBy,
-    };
-
-    await updateCombatState({
-      ...combatState,
-      participants: [...combatState.participants, duplicate],
-    });
-  };
-
-  const newRound = async () => {
-    const newParticipants = combatState.participants.map((p) => ({
-      ...p,
-      initiativeCard: null,
-      status: "PENDING" as const,
-    }));
-
-    await updateCombatState({
-      ...combatState,
-      phase: "DRAWING",
-      roundNumber: combatState.roundNumber + 1,
-      participants: newParticipants,
-      currentTurnIndex: 0,
-      drawnCards: [],
-    });
-  };
+  const removeParticipant = (participantId: string) =>
+    run((s, c) => combat.removeParticipants(s, { ids: [participantId] }, c));
 
   const endCombat = async () => {
+    if (role !== "GM") return;
     await OBR.room.setMetadata({ [METADATA_KEY]: undefined });
     setCombatState(INITIAL_COMBAT_STATE);
     await OBR.notification.show("Combat ended");
-  };
-
-  const removeParticipant = async (participantId: string) => {
-    const participant = combatState.participants.find((p) => p.id === participantId);
-    const newParticipants = combatState.participants.filter(
-      (p) => p.id !== participantId
-    );
-
-    // Return card to pool if drawn
-    let newDrawnCards = combatState.drawnCards;
-    if (participant?.initiativeCard) {
-      newDrawnCards = combatState.drawnCards.filter(
-        (c) => c !== participant.initiativeCard
-      );
-    }
-
-    // Adjust turn index
-    const sorted = getSortedParticipants(combatState.participants);
-    const removedIndex = sorted.findIndex((p) => p.id === participantId);
-    let newTurnIndex = combatState.currentTurnIndex;
-    if (removedIndex !== -1 && removedIndex < combatState.currentTurnIndex) {
-      newTurnIndex = Math.max(0, combatState.currentTurnIndex - 1);
-    }
-
-    await updateCombatState({
-      ...combatState,
-      participants: newParticipants,
-      drawnCards: newDrawnCards,
-      currentTurnIndex: newTurnIndex,
-    });
   };
 
   const addParticipants = async () => {
@@ -432,45 +184,9 @@ function App() {
       await OBR.notification.show("Select tokens to add", "WARNING");
       return;
     }
-
-    const existingTokenIds = new Set(combatState.participants.map((p) => p.tokenId));
     const items = await OBR.scene.items.getItems(selection);
-    const allPlayerIds = partyPlayers.map((p) => p.id);
-
-    const newItems = items.filter((item: Item) => !existingTokenIds.has(item.id));
-    if (newItems.length === 0) {
-      await OBR.notification.show("Selected tokens are already in combat", "WARNING");
-      return;
-    }
-
-    const newParticipants: Participant[] = newItems.map((item: Item) => {
-      const creatorId = item.createdUserId;
-      const isPlayerOwned = creatorId && allPlayerIds.includes(creatorId);
-
-      // Resolve player display name for player-owned tokens
-      let displayName = item.name || "Unknown";
-      if (isPlayerOwned) {
-        const player = partyPlayers.find((p) => p.id === creatorId);
-        if (player?.name) displayName = player.name;
-      }
-
-      return {
-        id: crypto.randomUUID(),
-        tokenId: item.id,
-        name: displayName,
-        customName: null,
-        initiativeCard: null,
-        status: "PENDING",
-        controlledBy: isPlayerOwned ? creatorId : "GM",
-      };
-    });
-
-    await updateCombatState({
-      ...combatState,
-      participants: [...combatState.participants, ...newParticipants],
-    });
-
-    await OBR.notification.show(`Added ${newParticipants.length} participant(s)`);
+    const participants = combat.buildParticipants(items, partyPlayers);
+    await run((s, c) => combat.addParticipants(s, { participants }, c));
   };
 
   // === RENDER ===
@@ -479,10 +195,10 @@ function App() {
     return <div className="loading">Loading...</div>;
   }
 
-  const sorted = getSortedParticipants(combatState.participants);
+  const sorted = combat.sortedByCard(combatState.participants);
   const allDrawn = combatState.participants.every((p) => p.initiativeCard !== null);
-  const currentParticipant = sorted[combatState.currentTurnIndex];
-  const validSwapTargets = getValidSwapTargets();
+  const currentParticipant = combat.activeParticipant(combatState);
+  const validSwapTargets = combat.validSwapTargets(combatState);
   const isGM = role === "GM";
 
   const getStatusText = (): string => {
