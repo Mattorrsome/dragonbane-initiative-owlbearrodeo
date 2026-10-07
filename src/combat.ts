@@ -226,3 +226,78 @@ export function setCustomName(s: CombatState, a: { id: string; name: string }, c
   const trimmed = a.name.trim();
   return ok(mapP(s, a.id, (p) => ({ ...p, customName: trimmed.length > 0 ? trimmed : null })));
 }
+
+export function startRound(s: CombatState, ctx: Ctx): Result {
+  const denied = gmOnly(s, ctx, "start the round");
+  if (denied) return denied;
+  if (s.phase !== "DRAWING") return reject(s, "Round already started");
+  if (s.participants.length === 0 || s.participants.some((p) => p.initiativeCard === null))
+    return reject(s, "Everyone needs a card first");
+  return ok(
+    settle({
+      ...s,
+      phase: "ACTIVE",
+      participants: s.participants.map((p) => ({ ...p, status: "PENDING" as const })),
+    })
+  );
+}
+
+export function act(s: CombatState, ctx: Ctx): Result {
+  if (s.phase !== "ACTIVE") return reject(s, "No round in progress");
+  const cur = activeParticipant(s);
+  if (!cur) return reject(s, "No active participant");
+  if (!canControl(cur, ctx)) return reject(s, "It isn't your turn");
+  return ok(settle(mapP(s, cur.id, (p) => ({ ...p, status: "ACTED" as const }))));
+}
+
+export function validSwapTargets(s: CombatState): Participant[] {
+  const cur = activeParticipant(s);
+  if (!cur || cur.initiativeCard === null) return [];
+  const card = cur.initiativeCard;
+  return sortedByCard(s.participants).filter(
+    (p) =>
+      p.id !== cur.id &&
+      p.status !== "ACTED" &&
+      p.status !== "WAITED" &&
+      (p.initiativeCard as number) > card
+  );
+}
+
+export function swap(s: CombatState, a: { targetId: string }, ctx: Ctx): Result {
+  if (s.phase !== "ACTIVE") return reject(s, "No round in progress");
+  const cur = activeParticipant(s);
+  if (!cur) return reject(s, "No active participant");
+  if (!canControl(cur, ctx)) return reject(s, "It isn't your turn");
+  const target = validSwapTargets(s).find((p) => p.id === a.targetId);
+  if (!target) return reject(s, "That participant can't be swapped with");
+  return ok(
+    settle({
+      ...s,
+      participants: s.participants.map((p) =>
+        p.id === cur.id
+          ? { ...p, initiativeCard: target.initiativeCard, status: "WAITED" as const }
+          : p.id === target.id
+          ? { ...p, initiativeCard: cur.initiativeCard, status: "ACTIVE" as const }
+          : p
+      ),
+    })
+  );
+}
+
+export function removeParticipants(s: CombatState, a: { ids: string[] }, ctx: Ctx): Result {
+  const denied = gmOnly(s, ctx, "remove participants");
+  if (denied) return denied;
+  const gone = s.participants.filter((p) => a.ids.includes(p.id));
+  if (gone.length === 0) return ok(s);
+  const released = new Set(gone.flatMap(heldCards));
+  const next = settle({
+    ...s,
+    participants: s.participants.filter((p) => !a.ids.includes(p.id)),
+    drawnCards: s.drawnCards.filter((card) => !released.has(card)),
+  });
+  return ok(next, `${gone.map(displayName).join(", ")} removed from combat`);
+}
+
+/** Every participant entry (incl. Ferocity duplicates) backed by one of these tokens. */
+export const participantIdsForTokens = (s: CombatState, tokenIds: string[]): string[] =>
+  s.participants.filter((p) => tokenIds.includes(p.tokenId)).map((p) => p.id);

@@ -161,3 +161,111 @@ describe("setup reducers", () => {
     expect(c.setCustomName(s, { id: "a", name: "x" }, P1).error).toBeDefined();
   });
 });
+
+const mkRound = (cards: number[], over: Partial<Participant>[] = []) => {
+  const ps = cards.map((card, i) => mkP("abcdefghij"[i], { initiativeCard: card, ...over[i] }));
+  return c.startRound(mkS(ps), GM).state;
+};
+const order = (s: CombatState) => c.sortedByCard(s.participants).map((p) => p.id).join("");
+const activeId = (s: CombatState) => c.activeParticipant(s)?.id;
+
+describe("turn flow", () => {
+  it("startRound activates the lowest card", () => {
+    const s = mkRound([3, 1, 2]);
+    expect(s.phase).toBe("ACTIVE");
+    expect(activeId(s)).toBe("b");
+    expect(s.currentTurnIndex).toBe(0);
+  });
+
+  it("startRound rejects while a card is missing", () => {
+    const s = mkS([mkP("a", { initiativeCard: 1 }), mkP("b")]);
+    const r = c.startRound(s, GM);
+    expect(r.error).toBeDefined();
+    expect(r.state).toBe(s);
+  });
+
+  it("act advances in card order and completes the round", () => {
+    let s = mkRound([3, 1, 2]);
+    s = c.act(s, GM).state;
+    expect(activeId(s)).toBe("c");
+    expect(s.participants.find((p) => p.id === "b")?.status).toBe("ACTED");
+    s = c.act(s, GM).state;
+    s = c.act(s, GM).state;
+    expect(s.phase).toBe("ROUND_COMPLETE");
+    expect(activeId(s)).toBeUndefined();
+  });
+
+  it("act is limited to the controlling player or the GM", () => {
+    const s = mkRound([1, 2], [{ controlledBy: "p1" }, {}]);
+    expect(c.act(s, { ...P1, playerId: "p2" }).error).toBeDefined();
+    expect(c.act(s, P1).error).toBeUndefined();
+    const npc = mkRound([1, 2]);
+    expect(c.act(npc, P1).state).toBe(npc);
+  });
+
+  it("swap exchanges cards, marks the swapper WAITED and keeps order consistent", () => {
+    let s = mkRound([1, 2, 3]);
+    s = c.swap(s, { targetId: "c" }, GM).state;
+    expect(order(s)).toBe("cba");
+    expect(activeId(s)).toBe("c");
+    expect(s.participants.find((p) => p.id === "a")?.status).toBe("WAITED");
+    expect(s.currentTurnIndex).toBe(0);
+    s = c.act(s, GM).state;
+    expect(activeId(s)).toBe("b");
+    s = c.act(s, GM).state;
+    expect(activeId(s)).toBe("a");
+    s = c.act(s, GM).state;
+    expect(s.phase).toBe("ROUND_COMPLETE");
+  });
+
+  it("swap rejects ACTED, WAITED and lower-card targets", () => {
+    let s = mkRound([1, 2, 3]);
+    s = c.act(s, GM).state; // b active, a acted
+    expect(c.swap(s, { targetId: "a" }, GM).error).toBeDefined();
+    let t = c.swap(mkRound([1, 2, 3]), { targetId: "c" }, GM).state; // c active, a WAITED
+    expect(c.swap(t, { targetId: "a" }, GM).error).toBeDefined();
+    t = mkRound([1, 2, 3]);
+    expect(c.validSwapTargets(t).map((p) => p.id)).toEqual(["b", "c"]);
+  });
+
+  it("removeParticipants promotes the next participant when the active one is removed", () => {
+    const s = mkRound([1, 2, 3]);
+    const r = c.removeParticipants(s, { ids: ["a"] }, GM);
+    expect(activeId(r.state)).toBe("b");
+    expect(r.state.drawnCards).toEqual([2, 3]);
+    expect(r.state.currentTurnIndex).toBe(0);
+    expect(r.notice).toMatch(/removed/);
+  });
+
+  it("removeParticipants re-derives the turn index when a lower participant is removed", () => {
+    let s = mkRound([1, 2, 3]);
+    s = c.act(s, GM).state; // b active, index 1
+    expect(s.currentTurnIndex).toBe(1);
+    const r = c.removeParticipants(s, { ids: ["a"] }, GM);
+    expect(activeId(r.state)).toBe("b");
+    expect(r.state.currentTurnIndex).toBe(0);
+  });
+
+  it("removeParticipants completes the round when nobody unacted remains", () => {
+    let s = mkRound([1, 2]);
+    s = c.act(s, GM).state;
+    const r = c.removeParticipants(s, { ids: ["b"] }, GM);
+    expect(r.state.phase).toBe("ROUND_COMPLETE");
+    expect(r.state.drawnCards).toEqual([1]);
+    const all = c.removeParticipants(mkRound([1, 2]), { ids: ["a", "b"] }, GM);
+    expect(all.state.phase).toBe("ROUND_COMPLETE");
+    expect(all.state.participants).toEqual([]);
+  });
+
+  it("removeParticipants returns reserved pairs to the deck and is GM only", () => {
+    const s = mkS([mkP("a", { pendingCards: [4, 5] }), mkP("b", { initiativeCard: 2 })]);
+    expect(c.removeParticipants(s, { ids: ["a"] }, GM).state.drawnCards).toEqual([2]);
+    expect(c.removeParticipants(s, { ids: ["a"] }, P1).state).toBe(s);
+    expect(c.removeParticipants(s, { ids: ["zzz"] }, GM).state).toBe(s);
+  });
+
+  it("participantIdsForTokens returns every Ferocity duplicate of a token", () => {
+    const s = mkS([mkP("a", { tokenId: "t" }), mkP("a2", { tokenId: "t" }), mkP("b")]);
+    expect(c.participantIdsForTokens(s, ["t"])).toEqual(["a", "a2"]);
+  });
+});
