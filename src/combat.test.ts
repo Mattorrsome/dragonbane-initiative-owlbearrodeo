@@ -269,3 +269,58 @@ describe("turn flow", () => {
     expect(c.participantIdsForTokens(s, ["t"])).toEqual(["a", "a2"]);
   });
 });
+
+describe("drawing", () => {
+  it("drawCard takes a free card and records it", () => {
+    let s = mkS([mkP("a"), mkP("b")]);
+    s = c.drawCard(s, { id: "a" }, GM).state;
+    expect(s.participants[0].initiativeCard).toBe(1);
+    expect(s.drawnCards).toEqual([1]);
+    expect(s.lastDraw).toEqual({ participantId: "a", card: 1 });
+    s = c.drawCard(s, { id: "b" }, GM).state;
+    expect(s.participants[1].initiativeCard).toBe(2);
+  });
+
+  it("a player can draw only for their own participant", () => {
+    const s = mkS([mkP("a"), mkP("b", { controlledBy: "p1" })]);
+    expect(c.drawCard(s, { id: "a" }, P1).state).toBe(s);
+    expect(c.drawCard(s, { id: "b" }, P1).error).toBeUndefined();
+  });
+
+  it("drawCard rejects a second draw, a wrong phase and an empty deck", () => {
+    const s = mkS([mkP("a", { initiativeCard: 1 }), mkP("b")]);
+    expect(c.drawCard(s, { id: "a" }, GM).error).toBeDefined();
+    const active = mkS([mkP("a")], { phase: "ACTIVE" });
+    expect(c.drawCard(active, { id: "a" }, GM).error).toBeDefined();
+    const tiny = mkS([mkP("a"), mkP("b")], { deckSize: 1 });
+    const after = c.drawCard(tiny, { id: "a" }, GM).state;
+    expect(c.drawCard(after, { id: "b" }, GM).error).toMatch(/no cards/i);
+  });
+
+  it("drawAll draws unique cards without mutating the input", () => {
+    const s = mkS(Array.from({ length: 12 }, (_, i) => mkP("p" + i)));
+    const r = c.drawAll(s, { ...GM, rand: () => 0.99 }).state;
+    const cards = r.participants.map((p) => p.initiativeCard);
+    expect(new Set(cards).size).toBe(12);
+    expect(Math.max(...(cards as number[]))).toBeLessThanOrEqual(12);
+    expect(r.drawnCards).toHaveLength(12);
+    expect(s.participants[0].initiativeCard).toBeNull();
+    expect(s.drawnCards).toEqual([]);
+  });
+
+  it("drawAll covers a full 20-participant table and is GM only", () => {
+    const s = mkS(Array.from({ length: 20 }, (_, i) => mkP("p" + i)));
+    const cards = c.drawAll(s, GM).state.participants.map((p) => p.initiativeCard);
+    expect([...cards].sort((x, y) => (x as number) - (y as number))).toEqual(
+      Array.from({ length: 20 }, (_, i) => i + 1)
+    );
+    expect(c.drawAll(s, P1).state).toBe(s);
+  });
+
+  it("drawAll leaves already drawn participants alone", () => {
+    const s = mkS([mkP("a", { initiativeCard: 4 }), mkP("b")]);
+    const r = c.drawAll(s, GM).state;
+    expect(r.participants[0].initiativeCard).toBe(4);
+    expect(r.participants[1].initiativeCard).toBe(1);
+  });
+});

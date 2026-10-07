@@ -301,3 +301,53 @@ export function removeParticipants(s: CombatState, a: { ids: string[] }, ctx: Ct
 /** Every participant entry (incl. Ferocity duplicates) backed by one of these tokens. */
 export const participantIdsForTokens = (s: CombatState, tokenIds: string[]): string[] =>
   s.participants.filter((p) => tokenIds.includes(p.tokenId)).map((p) => p.id);
+
+/** True while a Surprise participant still has to pick a card. */
+export const waitingOnSurprise = (s: CombatState): boolean =>
+  s.participants.some((p) => p.surprise && p.initiativeCard === null);
+
+/** Shared preconditions for any draw/pick on behalf of a participant. */
+export function drawBlock(s: CombatState, p: Participant | undefined, ctx: Ctx): string | null {
+  if (!p) return "Participant not found";
+  if (s.phase !== "DRAWING") return "Cards can only be drawn while drawing";
+  if (!canControl(p, ctx)) return "You don't control that participant";
+  if (p.initiativeCard !== null || p.pendingCards) return "Already has a card";
+  return null;
+}
+
+export function drawCard(s: CombatState, a: { id: string }, ctx: Ctx): Result {
+  const p = findP(s, a.id);
+  const block = drawBlock(s, p, ctx);
+  if (block || !p) return reject(s, block ?? "Participant not found");
+  if (p.surprise) return reject(s, "Pick a card for Surprise");
+  if (p.lightningFast) return reject(s, "Lightning Fast draws two cards");
+  if (waitingOnSurprise(s)) return reject(s, "Waiting for surprise picks");
+  const free = freeCards(s);
+  if (free.length === 0) return reject(s, "No cards left in the deck");
+  const card = pick(free, ctx);
+  return ok({
+    ...mapP(s, a.id, (x) => ({ ...x, initiativeCard: card })),
+    drawnCards: [...s.drawnCards, card],
+    lastDraw: { participantId: a.id, card },
+  });
+}
+
+export function drawAll(s: CombatState, ctx: Ctx): Result {
+  const denied = gmOnly(s, ctx, "draw for everyone");
+  if (denied) return denied;
+  if (s.phase !== "DRAWING") return reject(s, "Cards can only be drawn while drawing");
+  if (waitingOnSurprise(s)) return reject(s, "Waiting for surprise picks");
+  let drawn = s.drawnCards;
+  let changed = false;
+  const participants = s.participants.map((p) => {
+    if (p.initiativeCard !== null || p.pendingCards || p.lightningFast) return p;
+    const free = freeCards({ deckSize: s.deckSize, drawnCards: drawn });
+    if (free.length === 0) return p;
+    const card = pick(free, ctx);
+    drawn = [...drawn, card];
+    changed = true;
+    return { ...p, initiativeCard: card };
+  });
+  if (!changed) return reject(s, "Nobody left to draw for");
+  return ok({ ...s, participants, drawnCards: drawn, lastDraw: null });
+}
