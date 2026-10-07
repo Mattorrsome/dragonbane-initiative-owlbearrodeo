@@ -565,3 +565,25 @@ describe("GM overrides", () => {
     expect(c.gmSetCard(done, { id: "a", card: 6 }, GM).state).toBe(done);
   });
 });
+
+describe("final review fixes", () => {
+  it("gmSwapCards and gmSetCard clear lastDraw", () => {
+    const s = mkS([mkP("a", { initiativeCard: 4 }), mkP("b")], { lastDraw: { participantId: "a", card: 4 } });
+    expect(c.gmSwapCards(s, { first: "a", second: "b" }, GM).state.lastDraw).toBeNull();
+    expect(c.gmSetCard(s, { id: "b", card: 2 }, GM).state.lastDraw).toBeNull();
+  });
+
+  it("addParticipants and addFerocity never shrink the deck below a held card", () => {
+    const s = mkS([mkP("a", { initiativeCard: 13 }), mkP("b")], { deckSize: 14 });
+    expect(c.addParticipants(s, { participants: [mkP("n")] }, GM).state.deckSize).toBe(14);
+    expect(c.addFerocity(s, { id: "b", newId: "b2" }, GM).state.deckSize).toBe(14);
+  });
+
+  it("normalizeState recovers an ACTIVE save with nobody ACTIVE, and leaves healthy states alone", () => {
+    const stuck = { ...mkRound([1, 2]), participants: mkRound([1, 2]).participants.map((p) => ({ ...p, status: "PENDING" })) };
+    const fixed = c.normalizeState(stuck);
+    expect(c.activeParticipant(fixed)?.id).toBe("a");
+    const healthy = mkRound([1, 2]);
+    expect(c.normalizeState(healthy)).toEqual(healthy);
+  });
+});

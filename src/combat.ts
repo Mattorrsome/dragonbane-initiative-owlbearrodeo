@@ -123,13 +123,13 @@ export function normalizeState(raw: unknown): CombatState {
   if (!raw || typeof raw !== "object") return INITIAL_COMBAT_STATE;
   const s = raw as Partial<CombatState>;
   const participants = (s.participants ?? []).map(withDefaults);
-  return {
+  return settle({
     ...INITIAL_COMBAT_STATE,
     ...s,
     participants,
     deckSize: s.deckSize ?? deckSizeOf(participants),
     lastDraw: s.lastDraw ?? null,
-  };
+  });
 }
 
 export interface TokenInfo {
@@ -193,7 +193,7 @@ export function addParticipants(
     return reject(s, `At most ${MAX_PARTICIPANTS} participants`);
   const participants = [...s.participants, ...fresh];
   return ok(
-    { ...s, participants, deckSize: deckSizeOf(participants) },
+    { ...s, participants, deckSize: Math.max(s.deckSize, deckSizeOf(participants)) },
     `Added ${fresh.length} participant(s)`
   );
 }
@@ -216,7 +216,7 @@ export function addFerocity(s: CombatState, a: { id: string; newId: string }, ct
       controlledBy: p.controlledBy,
     }),
   ];
-  return ok({ ...s, participants, deckSize: deckSizeOf(participants) });
+  return ok({ ...s, participants, deckSize: Math.max(s.deckSize, deckSizeOf(participants)) });
 }
 
 export function setCustomName(s: CombatState, a: { id: string; name: string }, ctx: Ctx): Result {
@@ -365,8 +365,6 @@ export function setLightningFast(
   if (s.phase !== "DRAWING" || !unheld(p))
     return reject(s, "Lightning Fast can only change before drawing");
   const next = mapP(s, a.id, (x) => ({ ...x, lightningFast: a.value }));
-  if (a.value && deckSizeOf(next.participants) > MAX_PARTICIPANTS)
-    return reject(s, "Deck is full");
   return ok({ ...next, deckSize: Math.max(next.deckSize, deckSizeOf(next.participants)) });
 }
 
@@ -495,6 +493,7 @@ export function gmSwapCards(
           ? { ...p, initiativeCard: x.initiativeCard }
           : p
       ),
+      lastDraw: null,
     })
   );
 }
@@ -533,6 +532,7 @@ export function gmSetCard(
     settle({
       ...mapP(s, a.id, (x) => ({ ...x, initiativeCard: a.card })),
       drawnCards: a.card === null ? kept : [...kept, a.card],
+      lastDraw: null,
     })
   );
 }
