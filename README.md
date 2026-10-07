@@ -21,8 +21,16 @@ The Dragonbane initiative system uses a virtual deck of 10 cards numbered 1-10:
 - You can only swap initiative cards with participants who haven't acted yet
 - This means you can only swap initiative cards with participants who have a higher initiative number than you
 - After waiting, you're marked as "Waited" and can no longer be a swap target
-- NPCs/monsters (GM-controlled) cannot initiate waits, but can be wait targets
+- NPCs/monsters (GM-controlled) can wait like any other participant; the GM controls them
 
+### Abilities and GM tools
+
+- **Lightning Fast**: toggle on a participant before drawing. They draw two cards and keep one.
+- **Surprise** (GM, round 1 only): the participant picks any free card before anyone else draws.
+- **Keep card next round** (Veteran): toggle at any time before "Draw New Round"; the participant keeps their final card.
+- The extension does not check that a character actually has an ability.
+- The GM can swap two participants' cards (⇄), toggle Wait without exchanging cards, and set or clear any card.
+- The deck holds `min(20, max(10, participants + Lightning Fast participants))` cards; at 20 participants, adding more is disabled.
 ## Usage Guide
 
 ### For Game Masters
@@ -64,7 +72,7 @@ The duplicate entries share the same token on the map - only the initiative trac
 #### Your Turn
 When your character is highlighted as active:
 - Click **"Act"** to complete your turn
-- Click **"Swap"** to exchange initiative with another participant (see swap rules above)
+- Click **"Wait"** to exchange initiative with another participant (see swap rules above)
 
 ## Interface Guide
 
@@ -74,7 +82,7 @@ When your character is highlighted as active:
 | Card with "?" | Card not yet drawn |
 | Highlighted row | Currently active turn |
 | Dimmed row | Already acted this round |
-| Teal left border | "Waited" status (swapped, cannot be swap target) |
+| Teal left border | "Waited" status (waited, cannot be wait target) |
 
 ## Status Indicators
 

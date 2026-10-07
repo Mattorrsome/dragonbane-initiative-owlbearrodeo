@@ -13,8 +13,7 @@ An Owlbear Rodeo extension that implements the Dragonbane RPG initiative system 
 - `npm run dev` — Start Vite dev server (add `http://localhost:5173/manifest.json` to Owlbear Rodeo to test)
 - `npm run build` — TypeScript check + Vite build (output in `dist/`)
 - `npm run preview` — Preview production build
-
-No linter or test runner is configured.
+- `npm test` — Run Vitest unit tests for `src/combat.ts`. No linter is configured.
 
 ## Architecture
 
@@ -32,12 +31,14 @@ All extension logic lives in `src/App.tsx` — a single component handling:
 - All user actions (draw cards, act, swap, ferocity, add/remove participants)
 - Rendering for both GM and Player roles
 
+Combat rules live in `src/combat.ts` as pure reducers (`(state, args, ctx) => Result`); `App.tsx` applies them via `dispatch` (re-read metadata, reduce, write).
+
 ### State management via Owlbear Rodeo Room Metadata
 
 - Combat state is stored in OBR Room Metadata under key `com.dragonbane-initiative/combat-state` (defined as `METADATA_KEY` in `src/types.ts`)
 - All state sync happens through `OBR.room.setMetadata()` / `OBR.room.onMetadataChange()` — no local state management library
 - State persists across page refreshes and scene changes
-- Token deletion is watched via `OBR.scene.items.onChange()` to auto-remove participants
+- Token deletion is watched by one GM-client `OBR.scene.items.onChange` subscription that only removes tokens it previously saw (scene switches never remove participants)
 
 ### Types
 
@@ -45,10 +46,10 @@ All extension logic lives in `src/App.tsx` — a single component handling:
 
 ### Key domain rules (Dragonbane initiative)
 
-- Deck of 10 cards (1-10), drawn randomly without replacement per round
+- Deck of min(20, max(10, participants + Lightning Fast participants)) cards, drawn randomly without replacement per round
 - Turn order: lowest card number acts first
 - Swap: exchange cards with someone who hasn't acted and has a higher number; swapper is marked "WAITED" and can no longer be a swap target
-- NPCs/monsters (controlledBy === "GM") cannot initiate swaps but can be swap targets
+- NPCs/monsters (controlledBy === "GM") can Wait and be Wait targets; the GM controls them
 - Ferocity: GM can duplicate a participant entry during drawing phase for monsters with multiple turns
 
 ## Deployment

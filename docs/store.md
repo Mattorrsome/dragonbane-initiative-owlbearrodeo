@@ -16,7 +16,7 @@ An Owlbear Rodeo extension that implements the Dragonbane RPG initiative system.
 
 ## How It Works
 
-In the Dragonbane RPG, initiative is determined by drawing numbered cards (1–10) from a shared deck. Each participant draws one card per round, and turns proceed from lowest number to highest. Players can wait and swap cards with others to take their turn strategically. This extension automates the entire system directly inside Owlbear Rodeo.
+In the Dragonbane RPG, initiative is determined by drawing numbered cards from a shared deck (1–10, growing up to 20 with larger tables). Each participant draws one card per round, and turns proceed from lowest number to highest. Players can wait and swap cards with others to take their turn strategically. This extension automates the entire system directly inside Owlbear Rodeo.
 
 ## Features
 
@@ -49,9 +49,13 @@ The GM sees full controls — add/remove participants, start rounds, and manage 
 
 ![GM View](https://raw.githubusercontent.com/gabriel-aleixo/dragonbane-initiative-owlbearrodeo/master/docs/images/gm-view.jpg)
 
+### Abilities and GM Tools
+
+Toggle **Lightning Fast** (draw two cards, keep one), **Surprise** (GM, round 1: pick any free card first) and **Keep card next round** (Veteran) per participant; the GM can also swap cards, toggle Wait, and set or clear any card. The extension does not check that a character has an ability.
+
 ### Real-Time Sync
 
-All combat state is synced in real time through Owlbear Rodeo's room metadata. State persists across page refreshes and scene changes — no data is lost if someone disconnects. *Note on race conditions*: in the rare case two players click draw at the same time and happen to draw the same card, once the state is synced, one of the players may see their card number refreshed to a new number.
+All combat state is synced in real time through Owlbear Rodeo's room metadata. State persists across page refreshes and scene changes — no data is lost if someone disconnects. *Note*: every action re-reads the latest shared state before applying, so simultaneous clicks are safe in normal use; in the rare case two clients act within the same few milliseconds, one action may be rejected with a short notice and can simply be repeated.
 
 ## Installation
 
