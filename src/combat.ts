@@ -473,3 +473,66 @@ export function newRound(s: CombatState, ctx: Ctx): Result {
     lastDraw: null,
   });
 }
+export function gmSwapCards(
+  s: CombatState,
+  a: { first: string; second: string },
+  ctx: Ctx
+): Result {
+  const denied = gmOnly(s, ctx, "swap cards");
+  if (denied) return denied;
+  if (s.phase === "ROUND_COMPLETE") return reject(s, "The round is complete");
+  const x = findP(s, a.first);
+  const y = findP(s, a.second);
+  if (!x || !y || x.id === y.id) return reject(s, "Pick two different participants");
+  if (x.pendingCards || y.pendingCards) return reject(s, "Wait for the pending choice");
+  return ok(
+    settle({
+      ...s,
+      participants: s.participants.map((p) =>
+        p.id === x.id
+          ? { ...p, initiativeCard: y.initiativeCard }
+          : p.id === y.id
+          ? { ...p, initiativeCard: x.initiativeCard }
+          : p
+      ),
+    })
+  );
+}
+
+export function gmToggleWait(s: CombatState, a: { id: string }, ctx: Ctx): Result {
+  const denied = gmOnly(s, ctx, "toggle Wait");
+  if (denied) return denied;
+  if (s.phase !== "ACTIVE") return reject(s, "No round in progress");
+  const p = findP(s, a.id);
+  if (!p) return reject(s, "Participant not found");
+  if (p.status === "ACTED") return reject(s, "Already acted");
+  const waiting = p.status !== "WAITED";
+  return ok(
+    settle(
+      mapP(s, a.id, (x) => ({ ...x, status: waiting ? ("WAITED" as const) : ("PENDING" as const) })),
+      waiting ? a.id : undefined
+    )
+  );
+}
+
+export function gmSetCard(
+  s: CombatState,
+  a: { id: string; card: number | null },
+  ctx: Ctx
+): Result {
+  const denied = gmOnly(s, ctx, "set cards");
+  if (denied) return denied;
+  if (s.phase === "ROUND_COMPLETE") return reject(s, "The round is complete");
+  const p = findP(s, a.id);
+  if (!p) return reject(s, "Participant not found");
+  if (p.pendingCards) return reject(s, "Wait for the pending choice");
+  if (a.card !== null && a.card !== p.initiativeCard && !freeCards(s).includes(a.card))
+    return reject(s, "That card isn't available");
+  const kept = s.drawnCards.filter((card) => card !== p.initiativeCard);
+  return ok(
+    settle({
+      ...mapP(s, a.id, (x) => ({ ...x, initiativeCard: a.card })),
+      drawnCards: a.card === null ? kept : [...kept, a.card],
+    })
+  );
+}

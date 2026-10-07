@@ -473,3 +473,95 @@ describe("Keep card and newRound", () => {
     expect(c.newRound(active, GM).state).toBe(active);
   });
 });
+describe("GM overrides", () => {
+  it("gmSwapCards exchanges cards and keeps the same participant active", () => {
+    const s = mkRound([1, 2, 3]);
+    const r = c.gmSwapCards(s, { first: "a", second: "c" }, GM).state;
+    expect(r.participants.find((p) => p.id === "a")?.initiativeCard).toBe(3);
+    expect(r.participants.find((p) => p.id === "c")?.initiativeCard).toBe(1);
+    expect(activeId(r)).toBe("a");
+    expect(r.currentTurnIndex).toBe(2);
+    expect(r.participants.map((p) => p.status)).toEqual(["ACTIVE", "PENDING", "PENDING"]);
+  });
+
+  it("gmSwapCards is GM only, needs two different people and is blocked when complete", () => {
+    const s = mkRound([1, 2]);
+    expect(c.gmSwapCards(s, { first: "a", second: "b" }, P1).state).toBe(s);
+    expect(c.gmSwapCards(s, { first: "a", second: "a" }, GM).state).toBe(s);
+    const done = c.act(c.act(s, GM).state, GM).state;
+    expect(done.phase).toBe("ROUND_COMPLETE");
+    expect(c.gmSwapCards(done, { first: "a", second: "b" }, GM).state).toBe(done);
+  });
+
+  it("gmSwapCards works while drawing, including with a participant who has no card", () => {
+    const s = mkS([mkP("a", { initiativeCard: 4 }), mkP("b")]);
+    const r = c.gmSwapCards(s, { first: "a", second: "b" }, GM).state;
+    expect(r.participants.map((p) => p.initiativeCard)).toEqual([null, 4]);
+  });
+
+  it("gmToggleWait marks the active participant WAITED without moving cards, then clears it", () => {
+    let s = mkRound([1, 2, 3]);
+    s = c.gmToggleWait(s, { id: "a" }, GM).state;
+    expect(s.participants.find((p) => p.id === "a")).toMatchObject({ status: "WAITED", initiativeCard: 1 });
+    expect(activeId(s)).toBe("b");
+    s = c.gmToggleWait(s, { id: "a" }, GM).state;
+    expect(s.participants.find((p) => p.id === "a")?.status).toBe("PENDING");
+    expect(activeId(s)).toBe("b");
+  });
+
+  it("a waited participant acts once they are the lowest remaining", () => {
+    let s = c.gmToggleWait(mkRound([1, 2, 3]), { id: "a" }, GM).state;
+    s = c.act(s, GM).state; // b acts
+    expect(activeId(s)).toBe("a");
+    expect(c.gmToggleWait(s, { id: "zzz" }, GM).state).toBe(s);
+  });
+
+  it("gmToggleWait rejects ACTED participants, non-GM and other phases", () => {
+    let s = mkRound([1, 2]);
+    s = c.act(s, GM).state;
+    expect(c.gmToggleWait(s, { id: "a" }, GM).error).toBeDefined();
+    expect(c.gmToggleWait(s, { id: "b" }, P1).error).toBeDefined();
+    const drawing = mkS([mkP("a")]);
+    expect(c.gmToggleWait(drawing, { id: "a" }, GM).state).toBe(drawing);
+  });
+
+  it("gmSetCard assigns a free card, returning the old one", () => {
+    const s = mkRound([1, 2, 3]);
+    const r = c.gmSetCard(s, { id: "a", card: 9 }, GM).state;
+    expect(r.participants[0].initiativeCard).toBe(9);
+    expect(r.drawnCards.slice().sort((x, y) => x - y)).toEqual([2, 3, 9]);
+    expect(activeId(r)).toBe("a");
+    expect(r.currentTurnIndex).toBe(2);
+  });
+
+  it("gmSetCard rejects taken, out-of-range and non-GM requests, and pending pairs", () => {
+    const s = mkRound([1, 2, 3]);
+    expect(c.gmSetCard(s, { id: "a", card: 3 }, GM).state).toBe(s);
+    expect(c.gmSetCard(s, { id: "a", card: 0 }, GM).state).toBe(s);
+    expect(c.gmSetCard(s, { id: "a", card: 11 }, GM).state).toBe(s);
+    expect(c.gmSetCard(s, { id: "a", card: 5 }, P1).state).toBe(s);
+    const pending = mkS([mkP("a", { pendingCards: [1, 2] })]);
+    expect(c.gmSetCard(pending, { id: "a", card: 5 }, GM).state).toBe(pending);
+  });
+
+  it("clearing the active participant's card promotes the next one", () => {
+    const s = mkRound([1, 2, 3]);
+    const r = c.gmSetCard(s, { id: "a", card: null }, GM).state;
+    expect(activeId(r)).toBe("b");
+    expect(r.participants[0]).toMatchObject({ initiativeCard: null, status: "PENDING" });
+    expect(r.drawnCards).toEqual([2, 3]);
+  });
+
+  it("clearing the last unacted participant completes the round", () => {
+    let s = mkRound([1, 2]);
+    s = c.act(s, GM).state;
+    expect(c.gmSetCard(s, { id: "b", card: null }, GM).state.phase).toBe("ROUND_COMPLETE");
+  });
+
+  it("gmSetCard works while drawing and is blocked when the round is complete", () => {
+    const s = mkS([mkP("a", { initiativeCard: 2 })]);
+    expect(c.gmSetCard(s, { id: "a", card: 6 }, GM).state.drawnCards).toEqual([6]);
+    const done = mkS([mkP("a", { initiativeCard: 2, status: "ACTED" })], { phase: "ROUND_COMPLETE" });
+    expect(c.gmSetCard(done, { id: "a", card: 6 }, GM).state).toBe(done);
+  });
+});
