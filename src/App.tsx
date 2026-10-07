@@ -201,6 +201,29 @@ function App() {
     await run((s, c) => combat.addParticipants(s, { participants }, c));
   };
 
+  const [gmSwapFirst, setGmSwapFirst] = useState<string | null>(null);
+
+  const setLightningFast = (id: string, value: boolean) =>
+    run((s, c) => combat.setLightningFast(s, { id, value }, c));
+  const setSurprise = (id: string, value: boolean) =>
+    run((s, c) => combat.setSurprise(s, { id, value }, c));
+  const setRetainNext = (id: string, value: boolean) =>
+    run((s, c) => combat.setRetainNext(s, { id, value }, c));
+  const chooseCard = (id: string, card: number) =>
+    run((s, c) => combat.chooseOne(s, { id, card }, c));
+  const pickSurprise = (id: string, card: number) =>
+    run((s, c) => combat.pickSurpriseCard(s, { id, card }, c));
+  const gmWait = (id: string) => run((s, c) => combat.gmToggleWait(s, { id }, c));
+  const gmSetCard = (id: string, card: number | null) =>
+    run((s, c) => combat.gmSetCard(s, { id, card }, c));
+  const gmSwapClick = async (id: string) => {
+    if (gmSwapFirst === null) return setGmSwapFirst(id);
+    if (gmSwapFirst === id) return setGmSwapFirst(null);
+    const first = gmSwapFirst;
+    setGmSwapFirst(null);
+    await run((s, c) => combat.gmSwapCards(s, { first, second: id }, c));
+  };
+
   // === RENDER ===
 
   if (!isReady) {
@@ -220,11 +243,18 @@ function App() {
     return `Round ${combatState.roundNumber} - Active`;
   };
 
+  const surpriseOutstanding = combat.waitingOnSurprise(combatState);
+
   const getParticipantStatusText = (p: Participant): string => {
     if (p.status === "ACTIVE") return "Active";
     if (p.status === "ACTED") return "Acted";
     if (p.status === "WAITED") return "Waited";
-    if (combatState.phase === "DRAWING" && p.initiativeCard === null) return "Draw card";
+    if (combatState.phase === "DRAWING" && p.initiativeCard === null) {
+      if (p.pendingCards) return "Choosing...";
+      if (p.surprise) return "Surprise: pick a card";
+      if (surpriseOutstanding) return "Waiting for surprise picks";
+      return p.lightningFast ? "Draw two cards" : "Draw card";
+    }
     return "";
   };
 
@@ -241,7 +271,10 @@ function App() {
       {/* Header */}
       <div className="header">
         <h1>Draw Initiative</h1>
-        <span className="status-badge">{getStatusText()}</span>
+        <span className="status-badge">
+          {getStatusText()}
+          {combatState.isActive && ` · Deck 1-${combatState.deckSize}`}
+        </span>
       </div>
 
       {/* No Combat State */}
@@ -262,13 +295,30 @@ function App() {
         <>
           <div className="scroll-area">
           {/* Participant List */}
+          {combatState.phase === "DRAWING" && combatState.lastDraw && (
+            <div className="last-draw">
+              {(() => {
+                const who = combatState.participants.find(
+                  (p) => p.id === combatState.lastDraw!.participantId
+                );
+                return who ? `${getDisplayName(who)} drew #${combatState.lastDraw.card}` : null;
+              })()}
+            </div>
+          )}
           <div className="participant-list">
             {displayParticipants.map((p) => {
               const isActive = p.status === "ACTIVE" && combatState.phase === "ACTIVE";
               const canDraw =
                 combatState.phase === "DRAWING" &&
                 p.initiativeCard === null &&
+                !p.pendingCards &&
+                !p.surprise &&
                 canControl(p);
+              const drawing = combatState.phase === "DRAWING";
+              const unheld = p.initiativeCard === null && !p.pendingCards;
+              const mine = canControl(p);
+              const free = combat.freeCards(combatState);
+              const atCap = combatState.participants.length >= combat.MAX_PARTICIPANTS;
 
               return (
                 <div
@@ -310,23 +360,127 @@ function App() {
                       </div>
                     )}
                     <div className="participant-status">{getParticipantStatusText(p)}</div>
+                    <div className="toggle-row">
+                      {drawing && unheld && mine && (
+                        <label className="toggle">
+                          <input
+                            type="checkbox"
+                            checked={p.lightningFast}
+                            onChange={(e) => setLightningFast(p.id, e.target.checked)}
+                          />
+                          Lightning Fast
+                        </label>
+                      )}
+                      {isGM && drawing && unheld && combatState.roundNumber === 1 && (
+                        <label className="toggle">
+                          <input
+                            type="checkbox"
+                            checked={p.surprise}
+                            onChange={(e) => setSurprise(p.id, e.target.checked)}
+                          />
+                          Surprise
+                        </label>
+                      )}
+                      {mine && (
+                        <label className="toggle">
+                          <input
+                            type="checkbox"
+                            checked={p.retainNext}
+                            onChange={(e) => setRetainNext(p.id, e.target.checked)}
+                          />
+                          Keep card next round
+                        </label>
+                      )}
+                    </div>
                   </div>
 
                   {/* Actions */}
                   <div className="participant-actions">
-                    {isGM && combatState.phase === "DRAWING" && p.controlledBy === "GM" && (
+                    {isGM && drawing && p.controlledBy === "GM" && (
                       <button
                         className="btn-secondary btn-small"
                         onClick={() => addFerocity(p.id)}
-                        title="Add Ferocity"
+                        disabled={atCap}
+                        title={atCap ? "Maximum 20 participants" : "Add Ferocity"}
                       >
                         +Ferocity
                       </button>
                     )}
                     {canDraw && (
-                      <button className="btn-primary btn-small" onClick={() => drawCard(p.id)}>
-                        Draw
+                      <button
+                        className="btn-primary btn-small"
+                        onClick={() => drawCard(p.id)}
+                        disabled={surpriseOutstanding}
+                      >
+                        {p.lightningFast ? "Draw 2" : "Draw"}
                       </button>
+                    )}
+                    {p.pendingCards && mine && (
+                      <>
+                        {p.pendingCards.map((card) => (
+                          <button
+                            key={card}
+                            className="btn-primary btn-small"
+                            onClick={() => chooseCard(p.id, card)}
+                          >
+                            #{card}
+                          </button>
+                        ))}
+                      </>
+                    )}
+                    {p.surprise && p.initiativeCard === null && mine && (
+                      <select
+                        className="card-select"
+                        value=""
+                        onChange={(e) => e.target.value && pickSurprise(p.id, Number(e.target.value))}
+                      >
+                        <option value="">Pick…</option>
+                        {free.map((card) => (
+                          <option key={card} value={card}>
+                            {card}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+
+                    {isGM && combatState.phase !== "ROUND_COMPLETE" && (
+                      <>
+                        <button
+                          className={`btn-secondary btn-small ${gmSwapFirst === p.id ? "selected" : ""}`}
+                          onClick={() => gmSwapClick(p.id)}
+                          title={gmSwapFirst ? "Swap cards with this participant" : "Swap cards (pick two)"}
+                        >
+                          ⇄
+                        </button>
+                        {combatState.phase === "ACTIVE" && p.status !== "ACTED" && (
+                          <button
+                            className="btn-secondary btn-small"
+                            onClick={() => gmWait(p.id)}
+                            title="Toggle Wait without exchanging cards"
+                          >
+                            {p.status === "WAITED" ? "Unwait" : "Wait"}
+                          </button>
+                        )}
+                        {!p.pendingCards && (
+                          <select
+                            className="card-select"
+                            value=""
+                            onChange={(e) => {
+                              if (e.target.value === "") return;
+                              gmSetCard(p.id, e.target.value === "none" ? null : Number(e.target.value));
+                            }}
+                            title="Set or clear card"
+                          >
+                            <option value="">Set…</option>
+                            {p.initiativeCard !== null && <option value="none">Clear</option>}
+                            {free.map((card) => (
+                              <option key={card} value={card}>
+                                {card}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </>
                     )}
 
                     {isGM && (
@@ -385,7 +539,12 @@ function App() {
           {/* Phase-specific GM actions */}
           {isGM && combatState.phase === "DRAWING" && (
             <div className="action-buttons sticky-actions">
-              <button className="btn-secondary btn-full" onClick={drawAllCards} disabled={allDrawn}>
+              <button
+                className="btn-secondary btn-full"
+                onClick={drawAllCards}
+                disabled={allDrawn || surpriseOutstanding}
+                title={surpriseOutstanding ? "Waiting for surprise picks" : undefined}
+              >
                 Draw All Cards
               </button>
               <button className="btn-primary btn-full" onClick={startRound} disabled={!allDrawn}>
@@ -408,7 +567,11 @@ function App() {
           <div className="footer">
             <div className="footer-buttons">
               {isGM && combatState.phase === "DRAWING" && (
-                <button className="btn-secondary" onClick={addParticipants}>
+                <button
+                  className="btn-secondary"
+                  onClick={addParticipants}
+                  disabled={combatState.participants.length >= combat.MAX_PARTICIPANTS}
+                >
                   Add Participants
                 </button>
               )}

@@ -293,3 +293,39 @@ button:disabled {
   min-height: 100vh;
   opacity: 0.7;
 }
+
+.toggle-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 2px;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  opacity: 0.85;
+  cursor: pointer;
+}
+
+.card-select {
+  font-size: 12px;
+  max-width: 72px;
+}
+
+.btn-small.selected {
+  outline: 2px solid currentColor;
+}
+
+.last-draw {
+  font-size: 12px;
+  padding: 4px 8px;
+  opacity: 0.8;
+}
+
+.participant-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
