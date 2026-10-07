@@ -131,3 +131,98 @@ export function normalizeState(raw: unknown): CombatState {
     lastDraw: s.lastDraw ?? null,
   };
 }
+
+export interface TokenInfo {
+  id: string;
+  name: string;
+  createdUserId: string;
+}
+
+/** Shared by start combat and add participants. */
+export function buildParticipants(
+  items: TokenInfo[],
+  players: { id: string; name: string }[],
+  newId: () => string = () => crypto.randomUUID()
+): Participant[] {
+  return items.map((item) => {
+    const owner = players.find((pl) => pl.id === item.createdUserId);
+    return withDefaults({
+      id: newId(),
+      tokenId: item.id,
+      name: owner?.name || item.name || "Unknown",
+      controlledBy: owner ? owner.id : "GM",
+    });
+  });
+}
+
+const gmOnly = (s: CombatState, ctx: Ctx, what: string): Result | null =>
+  ctx.role === "GM" ? null : reject(s, `Only the GM can ${what}`);
+
+export function startCombat(s: CombatState, a: { participants: Participant[] }, ctx: Ctx): Result {
+  const denied = gmOnly(s, ctx, "start combat");
+  if (denied) return denied;
+  if (s.isActive) return reject(s, "Combat is already running");
+  if (a.participants.length === 0) return reject(s, "Select tokens to add to combat");
+  if (a.participants.length > MAX_PARTICIPANTS)
+    return reject(s, `At most ${MAX_PARTICIPANTS} participants`);
+  return ok(
+    {
+      ...INITIAL_COMBAT_STATE,
+      isActive: true,
+      phase: "DRAWING",
+      roundNumber: 1,
+      participants: a.participants,
+      deckSize: deckSizeOf(a.participants),
+    },
+    "Combat started!"
+  );
+}
+
+export function addParticipants(
+  s: CombatState,
+  a: { participants: Participant[] },
+  ctx: Ctx
+): Result {
+  const denied = gmOnly(s, ctx, "add participants");
+  if (denied) return denied;
+  if (s.phase !== "DRAWING") return reject(s, "Participants can only be added while drawing");
+  const known = new Set(s.participants.map((p) => p.tokenId));
+  const fresh = a.participants.filter((p) => !known.has(p.tokenId));
+  if (fresh.length === 0) return reject(s, "Selected tokens are already in combat");
+  if (s.participants.length + fresh.length > MAX_PARTICIPANTS)
+    return reject(s, `At most ${MAX_PARTICIPANTS} participants`);
+  const participants = [...s.participants, ...fresh];
+  return ok(
+    { ...s, participants, deckSize: deckSizeOf(participants) },
+    `Added ${fresh.length} participant(s)`
+  );
+}
+
+export function addFerocity(s: CombatState, a: { id: string; newId: string }, ctx: Ctx): Result {
+  const denied = gmOnly(s, ctx, "add Ferocity");
+  if (denied) return denied;
+  const p = findP(s, a.id);
+  if (!p) return reject(s, "Participant not found");
+  if (s.phase !== "DRAWING") return reject(s, "Ferocity can only be added while drawing");
+  if (s.participants.length >= MAX_PARTICIPANTS)
+    return reject(s, `At most ${MAX_PARTICIPANTS} participants`);
+  const participants = [
+    ...s.participants,
+    withDefaults({
+      id: a.newId,
+      tokenId: p.tokenId,
+      name: p.name,
+      customName: p.customName,
+      controlledBy: p.controlledBy,
+    }),
+  ];
+  return ok({ ...s, participants, deckSize: deckSizeOf(participants) });
+}
+
+export function setCustomName(s: CombatState, a: { id: string; name: string }, ctx: Ctx): Result {
+  const denied = gmOnly(s, ctx, "rename participants");
+  if (denied) return denied;
+  if (!findP(s, a.id)) return reject(s, "Participant not found");
+  const trimmed = a.name.trim();
+  return ok(mapP(s, a.id, (p) => ({ ...p, customName: trimmed.length > 0 ? trimmed : null })));
+}
