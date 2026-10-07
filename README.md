@@ -10,10 +10,10 @@ An Owlbear Rodeo extension that implements the Dragonbane RPG initiative system.
 
 ## How It Works
 
-The Dragonbane initiative system uses a virtual deck of 10 cards numbered 1-10:
+The Dragonbane initiative system uses a virtual deck of cards numbered 1 up to N, where N = min(20, max(10, participants + Lightning Fast participants)):
 
 - At the start of each round, participants draw cards from the deck
-- Turn order goes from **lowest** (1) to **highest** (10)
+- Turn order goes from **lowest** (1) to **highest** (the top card in the deck, up to 20)
 - On your turn, you can **Act** (take your turn) or **Wait** (exchange cards with someone else)
 
 ### Waiting Rules
@@ -31,6 +31,7 @@ The Dragonbane initiative system uses a virtual deck of 10 cards numbered 1-10:
 - The extension does not check that a character actually has an ability.
 - The GM can swap two participants' cards (⇄), toggle Wait without exchanging cards, and set or clear any card.
 - The deck holds `min(20, max(10, participants + Lightning Fast participants))` cards; at 20 participants, adding more is disabled.
+
 ## Usage Guide
 
 ### For Game Masters
