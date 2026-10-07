@@ -55,7 +55,7 @@ Toggle **Lightning Fast** (draw two cards, keep one), **Surprise** (GM, round 1:
 
 ### Real-Time Sync
 
-All combat state is synced in real time through Owlbear Rodeo's room metadata. State persists across page refreshes and scene changes — no data is lost if someone disconnects. *Note*: every action re-reads the latest shared state before applying, so simultaneous clicks are safe in normal use; in the rare case two clients act within the same few milliseconds, one action may be rejected with a short notice and can simply be repeated.
+All combat state is synced in real time through Owlbear Rodeo's room metadata. State persists across page refreshes and scene changes — no data is lost if someone disconnects. *Note*: every action re-reads the latest shared state before applying, so simultaneous clicks are safe in normal use; writes are last-writer-wins, so if two clients act within the same few milliseconds one action may be silently lost (not rejected) and can simply be repeated.
 
 ## Installation
 
