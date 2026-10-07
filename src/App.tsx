@@ -85,22 +85,33 @@ function App() {
 
     let sceneReady = false;
     let prevIds = new Set<string>();
+    let gen = 0; // bumped on every scene change/cleanup so stale async results are dropped
     const gmCtx: Ctx = { role: "GM", playerId };
 
-    const seed = async () => {
+    const seed = async (my: number) => {
       const items = await OBR.scene.items.getItems();
-      prevIds = new Set(items.map((i) => i.id));
+      if (my === gen) prevIds = new Set(items.map((i) => i.id));
     };
 
-    OBR.scene.isReady().then(async (ready) => {
-      sceneReady = ready;
-      if (ready) await seed();
-    });
+    const my0 = ++gen;
+    OBR.scene
+      .isReady()
+      .then(async (ready) => {
+        if (my0 !== gen) return;
+        sceneReady = ready;
+        if (ready) await seed(my0);
+      })
+      .catch(console.error);
 
     const unsubReady = OBR.scene.onReadyChange(async (ready) => {
+      const my = ++gen;
       sceneReady = ready;
       prevIds = new Set();
-      if (ready) await seed();
+      try {
+        if (ready) await seed(my);
+      } catch (e) {
+        console.error(e);
+      }
     });
 
     const unsubItems = OBR.scene.items.onChange((items) => {
@@ -111,10 +122,11 @@ function App() {
       if (gone.length === 0) return;
       dispatch((s) =>
         combat.removeParticipants(s, { ids: combat.participantIdsForTokens(s, gone) }, gmCtx)
-      );
+      ).catch(console.error);
     });
 
     return () => {
+      gen++;
       unsubReady();
       unsubItems();
     };
