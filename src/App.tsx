@@ -7,6 +7,8 @@ import type { Ctx, Result } from "./combat";
 type Role = "GM" | "PLAYER";
 type Theme = "DARK" | "LIGHT";
 
+const FEROCITY_COLORS = ["#ff7043", "#42a5f5", "#66bb6a", "#ffca28", "#ec407a", "#26c6da"];
+
 function App() {
   const [isReady, setIsReady] = useState(false);
   const [role, setRole] = useState<Role>("PLAYER");
@@ -292,6 +294,37 @@ function App() {
       ? combatState.participants
       : [...sorted, ...combatState.participants.filter((p) => p.initiativeCard === null)];
 
+  // Ferocity rows (same token) share a border colour and are numbered by turn-order position.
+  const ferocity = new Map<string, { color: number; n: number }>();
+  {
+    const byToken = new Map<string, string[]>();
+    for (const p of displayParticipants)
+      byToken.set(p.tokenId, [...(byToken.get(p.tokenId) ?? []), p.id]);
+    let color = 0;
+    for (const ids of byToken.values()) {
+      if (ids.length < 2) continue;
+      ids.forEach((id, i) => ferocity.set(id, { color, n: i + 1 }));
+      color++;
+    }
+  }
+
+  // Different tokens with the same name get "#1", "#2" in the order they were added.
+  const sameName = new Map<string, number>();
+  {
+    const tokensByName = new Map<string, string[]>();
+    for (const p of combatState.participants) {
+      const n = getDisplayName(p);
+      const t = tokensByName.get(n) ?? [];
+      if (!t.includes(p.tokenId)) tokensByName.set(n, [...t, p.tokenId]);
+    }
+    const dupes = new Map<string, number>();
+    for (const [n, t] of tokensByName) if (t.length > 1) t.forEach((tok, i) => dupes.set(`${n}|${tok}`, i + 1));
+    for (const p of combatState.participants) {
+      const k = `${getDisplayName(p)}|${p.tokenId}`;
+      if (dupes.has(k)) sameName.set(p.id, dupes.get(k)!);
+    }
+  }
+
   return (
     <div className={`app ${theme.toLowerCase()}`}>
       {/* Header */}
@@ -346,13 +379,15 @@ function App() {
               const mine = canControl(p);
               const free = combat.freeCards(combatState);
               const atCap = combatState.participants.length >= combat.MAX_PARTICIPANTS;
+              const fer = ferocity.get(p.id);
 
               return (
                 <div
                   key={p.id}
+                  style={fer ? ({ "--fer": FEROCITY_COLORS[fer.color % FEROCITY_COLORS.length] } as React.CSSProperties) : undefined}
                   className={`participant-row ${isActive ? "active" : ""} ${
                     p.status === "ACTED" ? "acted" : ""
-                  } ${p.status === "WAITED" ? "waited" : ""}`}
+                  } ${p.status === "WAITED" ? "waited" : ""} ${fer ? "ferocity" : ""}`}
                 >
                   {/* Initiative Card */}
                   <div
@@ -388,6 +423,8 @@ function App() {
                         }}
                       >
                         {getDisplayName(p)}
+                        {sameName.has(p.id) && ` #${sameName.get(p.id)}`}
+                        {fer && ` - ${fer.n}`}
                       </div>
                     )}
                     <div className="participant-status">{getParticipantStatusText(p)}</div>
