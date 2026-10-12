@@ -5,6 +5,7 @@
   "author": "Gabe A. & Matt Orr",
   "description": "Initiative tracker using the Dragonbane RPG card-based system",
   "icon": "/icon.svg",
+  "background_url": "/background.html",
   "action": {
     "title": "Draw Initiative",
     "icon": "/icon.svg",
