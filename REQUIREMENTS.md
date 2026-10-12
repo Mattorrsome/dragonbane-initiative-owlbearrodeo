@@ -61,7 +61,7 @@ Players can:
 ### 3.1 Phase 1: Combat Initiation
 1. GM selects one or more tokens on the battle map
 2. GM opens the initiative tracker extension (action popover)
-3. GM clicks **"Start Combat"** button
+3. GM clicks **"Start Combat with N selected"** (N = live count of selected tokens; button is disabled until at least one token is selected)
 4. All selected tokens are added as combat participants
 5. Extension enters the **Card Drawing Phase**
 
@@ -141,7 +141,7 @@ Each row displays:
 #### Action Buttons (Context-Dependent)
 
 **No Combat State:**
-- **"Start Combat"** (GM only) - Adds selected map tokens to tracker
+- **"Start Combat with N selected"** (GM only) - Adds selected map tokens to tracker; disabled with "Select tokens to start combat" when nothing is selected, count updates live on reselect
 
 **Drawing Phase:**
 - **"Draw Card"** per participant (for controlling player)

@@ -114,3 +114,14 @@ Version bumped to 2.1.0 (`package.json`, `package-lock.json`, `public/manifest.j
 | Ferocity numbering | Name suffix " - N", N = position within the group in displayed turn order (re-numbers as cards change). Before cards are drawn, and for rows without a card, falls back to added order. |
 | Duplicate names | Different tokens with the same display name (custom name if set) get " #1", " #2" in added order. Ferocity duplicates share a token and count once. Combined form: "Goblin #2 - 1". |
 | Scope | Labels render in the row only; the rename input and the "drew #N" line use the plain name. |
+
+## Start Combat selection awareness (2026-10-12)
+
+UI only in `App.tsx`; no reducer or state changes, no version bump.
+
+| Item | Change |
+|---|---|
+| Selection count | `selectionCount` state seeded from `OBR.player.getSelection()` once the SDK is ready, then kept live by `OBR.player.onChange` (fires on every reselect). |
+| Start button | Label "Start Combat with N selected" when N > 0. With nothing selected the button is disabled and reads "Select tokens to start combat". |
+| Selection preserved | The extension never clears selection (it only reads it; `background.ts` only calls `OBR.action.open()`). If tokens deselect on popover open, that is Owlbear behaviour, not extension code. |
+| Unchanged | `startCombat` still re-reads the selection on click, so the count is display-only. "Add Participants" button not changed. |
