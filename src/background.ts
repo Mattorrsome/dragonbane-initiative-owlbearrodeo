@@ -11,7 +11,10 @@ OBR.onReady(async () => {
   let wasActive = isActive(await OBR.room.getMetadata());
   OBR.room.onMetadataChange((metadata) => {
     const active = isActive(metadata);
-    if (active && !wasActive) OBR.action.open().catch(console.error);
+    if (active && !wasActive) {
+      last = []; // Start Combat deselects on purpose; don't restore it
+      OBR.action.open().catch(console.error);
+    }
     wasActive = active;
   });
 

@@ -192,7 +192,7 @@ function App() {
     }
     const items = await OBR.scene.items.getItems(selection);
     const participants = combat.buildParticipants(items, partyPlayers);
-    await run((s, c) => combat.startCombat(s, { participants }, c));
+    if (await run((s, c) => combat.startCombat(s, { participants }, c))) await OBR.player.deselect();
   };
 
   // Decide on the fresh state: Lightning Fast may have been toggled on another client.
