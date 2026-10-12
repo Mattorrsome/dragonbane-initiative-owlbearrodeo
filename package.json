@@ -1,25 +1,34 @@
 {
   "name": "dragonbane-initiative",
   "private": true,
-  "version": "2.1.0",
+  "version": "2.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint": "eslint ."
+  },
+  "engines": {
+    "node": ">=20.19"
   },
   "dependencies": {
-    "@owlbear-rodeo/sdk": "^2.2.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "@owlbear-rodeo/sdk": "^3.1.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "@types/react": "^18.2.0",
-    "@types/react-dom": "^18.2.0",
-    "@vitejs/plugin-react": "^4.2.0",
-    "typescript": "^5.3.0",
-    "vite": "^5.0.0",
-    "vitest": "^2.1.9"
+    "@eslint/js": "^10.0.1",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^6.1.2",
+    "eslint": "^10.12.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.13.0",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.71.1",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.4"
   }
 }

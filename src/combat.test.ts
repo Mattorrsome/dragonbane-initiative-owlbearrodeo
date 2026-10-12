@@ -23,7 +23,6 @@ export function mkP(id: string, over: Partial<Participant> = {}): Participant {
     initiativeCard: null,
     status: "PENDING",
     controlledBy: "GM",
-    previousCard: null,
     lightningFast: false,
     surprise: false,
     retainNext: false,
@@ -40,7 +39,6 @@ export function mkS(ps: Participant[], over: Partial<CombatState> = {}): CombatS
     phase: "DRAWING",
     roundNumber: 1,
     participants: ps,
-    currentTurnIndex: 0,
     drawnCards: drawn,
     deckSize: c.deckSizeOf(ps),
     lastDraw: null,
@@ -77,7 +75,6 @@ describe("normalizeState", () => {
     expect(s.deckSize).toBe(10);
     expect(s.lastDraw).toBeNull();
     expect(s.participants[0]).toMatchObject({
-      previousCard: null,
       lightningFast: false,
       surprise: false,
       retainNext: false,
@@ -154,6 +151,14 @@ describe("setup reducers", () => {
     expect(c.addFerocity(full, { id: "p0", newId: "x" }, GM).state).toBe(full);
   });
 
+  it("addFerocity copies Lightning Fast and grows the deck for it", () => {
+    const ps = Array.from({ length: 9 }, (_, i) => mkP("p" + i));
+    const s = mkS([mkP("a", { lightningFast: true }), ...ps]);
+    const r = c.addFerocity(s, { id: "a", newId: "a2" }, GM).state;
+    expect(r.participants[10].lightningFast).toBe(true);
+    expect(r.deckSize).toBe(13); // 11 participants + 2 Lightning Fast
+  });
+
   it("setCustomName trims and clears blank names", () => {
     const s = mkS([mkP("a")]);
     expect(c.setCustomName(s, { id: "a", name: "  Boss " }, GM).state.participants[0].customName).toBe("Boss");
@@ -174,7 +179,6 @@ describe("turn flow", () => {
     const s = mkRound([3, 1, 2]);
     expect(s.phase).toBe("ACTIVE");
     expect(activeId(s)).toBe("b");
-    expect(s.currentTurnIndex).toBe(0);
   });
 
   it("startRound rejects while a card is missing", () => {
@@ -209,7 +213,6 @@ describe("turn flow", () => {
     expect(order(s)).toBe("cba");
     expect(activeId(s)).toBe("c");
     expect(s.participants.find((p) => p.id === "a")?.status).toBe("WAITED");
-    expect(s.currentTurnIndex).toBe(0);
     s = c.act(s, GM).state;
     expect(activeId(s)).toBe("b");
     s = c.act(s, GM).state;
@@ -233,17 +236,7 @@ describe("turn flow", () => {
     const r = c.removeParticipants(s, { ids: ["a"] }, GM);
     expect(activeId(r.state)).toBe("b");
     expect(r.state.drawnCards).toEqual([2, 3]);
-    expect(r.state.currentTurnIndex).toBe(0);
     expect(r.notice).toMatch(/removed/);
-  });
-
-  it("removeParticipants re-derives the turn index when a lower participant is removed", () => {
-    let s = mkRound([1, 2, 3]);
-    s = c.act(s, GM).state; // b active, index 1
-    expect(s.currentTurnIndex).toBe(1);
-    const r = c.removeParticipants(s, { ids: ["a"] }, GM);
-    expect(activeId(r.state)).toBe("b");
-    expect(r.state.currentTurnIndex).toBe(0);
   });
 
   it("removeParticipants completes the round when nobody unacted remains", () => {
@@ -432,7 +425,7 @@ describe("Keep card and newRound", () => {
     expect(c.setRetainNext(s, { id: "b", value: true }, P1).error).toBeDefined();
   });
 
-  it("newRound keeps flagged cards, records previousCard and clears one-round flags", () => {
+  it("newRound keeps flagged cards and clears one-round flags", () => {
     const s = complete([
       mkP("a", { initiativeCard: 4, retainNext: true, status: "ACTED" }),
       mkP("b", { initiativeCard: 2, surprise: true, status: "ACTED" }),
@@ -441,8 +434,8 @@ describe("Keep card and newRound", () => {
     expect(r.phase).toBe("DRAWING");
     expect(r.roundNumber).toBe(2);
     expect(r.drawnCards).toEqual([4]);
-    expect(r.participants[0]).toMatchObject({ initiativeCard: 4, previousCard: 4, status: "PENDING", retainNext: false });
-    expect(r.participants[1]).toMatchObject({ initiativeCard: null, previousCard: 2, surprise: false });
+    expect(r.participants[0]).toMatchObject({ initiativeCard: 4, status: "PENDING", retainNext: false });
+    expect(r.participants[1]).toMatchObject({ initiativeCard: null, surprise: false });
     expect(r.lastDraw).toBeNull();
   });
 
@@ -481,7 +474,6 @@ describe("GM overrides", () => {
     expect(r.participants.find((p) => p.id === "a")?.initiativeCard).toBe(3);
     expect(r.participants.find((p) => p.id === "c")?.initiativeCard).toBe(1);
     expect(activeId(r)).toBe("a");
-    expect(r.currentTurnIndex).toBe(2);
     expect(r.participants.map((p) => p.status)).toEqual(["ACTIVE", "PENDING", "PENDING"]);
   });
 
@@ -532,7 +524,6 @@ describe("GM overrides", () => {
     expect(r.participants[0].initiativeCard).toBe(9);
     expect(r.drawnCards.slice().sort((x, y) => x - y)).toEqual([2, 3, 9]);
     expect(activeId(r)).toBe("a");
-    expect(r.currentTurnIndex).toBe(2);
   });
 
   it("gmSetCard rejects taken, out-of-range and non-GM requests, and pending pairs", () => {
@@ -586,5 +577,13 @@ describe("final review fixes", () => {
     expect(c.activeParticipant(fixed)?.id).toBe("a");
     const healthy = mkRound([1, 2]);
     expect(c.normalizeState(healthy)).toEqual(healthy);
+  });
+});
+
+describe("endCombat", () => {
+  it("resets to the initial state and is GM only", () => {
+    const s = mkRound([1, 2]);
+    expect(c.endCombat(s, GM).state).toEqual(INITIAL_COMBAT_STATE);
+    expect(c.endCombat(s, P1).state).toBe(s);
   });
 });

@@ -10,7 +10,6 @@ export interface Participant {
   initiativeCard: number | null;
   status: ParticipantStatus;
   controlledBy: string; // Player ID or "GM"
-  previousCard: number | null; // card held at the end of the last round
   lightningFast: boolean; // draws two cards, keeps one
   surprise: boolean; // picks a card before anyone else draws (round 1)
   retainNext: boolean; // Veteran: keep final card into the next round
@@ -22,7 +21,6 @@ export interface CombatState {
   phase: CombatPhase;
   roundNumber: number;
   participants: Participant[];
-  currentTurnIndex: number;
   drawnCards: number[]; // every taken card, incl. reserved pairs and kept cards
   deckSize: number;
   lastDraw: { participantId: string; card: number } | null;
@@ -33,7 +31,6 @@ export const INITIAL_COMBAT_STATE: CombatState = {
   phase: "DRAWING",
   roundNumber: 0,
   participants: [],
-  currentTurnIndex: 0,
   drawnCards: [],
   deckSize: 10,
   lastDraw: null,

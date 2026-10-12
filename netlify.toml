@@ -2,9 +2,18 @@
   publish = "dist"
   command = "npm run build"
 
+[build.environment]
+  NODE_VERSION = "22"
+
 [[headers]]
   for = "/*"
   [headers.values]
     Access-Control-Allow-Origin = "*"
     Access-Control-Allow-Methods = "GET, OPTIONS"
     Access-Control-Allow-Headers = "Content-Type"
+
+# Only Owlbear Rodeo may embed the extension popover.
+[[headers]]
+  for = "/extension.html"
+  [headers.values]
+    Content-Security-Policy = "frame-ancestors https://www.owlbear.rodeo https://owlbear.rodeo"

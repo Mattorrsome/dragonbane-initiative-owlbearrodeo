@@ -70,7 +70,7 @@ export const activeParticipant = (s: CombatState): Participant | undefined =>
 /**
  * After any change in ACTIVE phase: guarantee exactly one ACTIVE participant who holds a
  * card, promoting the lowest-card unacted participant (skipping `skipId` once), or move
- * to ROUND_COMPLETE if nobody is left. Re-derives currentTurnIndex from the active id.
+ * to ROUND_COMPLETE if nobody is left.
  */
 export function settle(s: CombatState, skipId?: string): CombatState {
   if (s.phase !== "ACTIVE") return s;
@@ -84,7 +84,7 @@ export function settle(s: CombatState, skipId?: string): CombatState {
     const left = sortedByCard(participants).filter((p) => p.status !== "ACTED");
     active = left.find((p) => p.id !== skipId) ?? left[0];
     if (!active) {
-      return { ...s, participants, phase: "ROUND_COMPLETE", currentTurnIndex: 0 };
+      return { ...s, participants, phase: "ROUND_COMPLETE" };
     }
     const promoted = active.id;
     participants = participants.map((p) =>
@@ -97,18 +97,13 @@ export function settle(s: CombatState, skipId?: string): CombatState {
     p.status === "ACTIVE" && p.id !== activeId ? { ...p, status: "PENDING" as const } : p
   );
 
-  return {
-    ...s,
-    participants,
-    currentTurnIndex: sortedByCard(participants).findIndex((p) => p.id === activeId),
-  };
+  return { ...s, participants };
 }
 
 const DEFAULTS = {
   customName: null,
   initiativeCard: null,
   status: "PENDING",
-  previousCard: null,
   lightningFast: false,
   surprise: false,
   retainNext: false,
@@ -178,6 +173,12 @@ export function startCombat(s: CombatState, a: { participants: Participant[] }, 
   );
 }
 
+export function endCombat(s: CombatState, ctx: Ctx): Result {
+  const denied = gmOnly(s, ctx, "end combat");
+  if (denied) return denied;
+  return ok(INITIAL_COMBAT_STATE, "Combat ended");
+}
+
 export function addParticipants(
   s: CombatState,
   a: { participants: Participant[] },
@@ -214,6 +215,7 @@ export function addFerocity(s: CombatState, a: { id: string; newId: string }, ct
       name: p.name,
       customName: p.customName,
       controlledBy: p.controlledBy,
+      lightningFast: p.lightningFast,
     }),
   ];
   return ok({ ...s, participants, deckSize: Math.max(s.deckSize, deckSizeOf(participants)) });
@@ -468,7 +470,6 @@ export function newRound(s: CombatState, ctx: Ctx): Result {
   if (s.phase !== "ROUND_COMPLETE") return reject(s, "The round isn't complete");
   const participants = s.participants.map((p) => ({
     ...p,
-    previousCard: p.initiativeCard,
     initiativeCard: p.retainNext ? p.initiativeCard : null,
     status: "PENDING" as const,
     retainNext: false,
@@ -481,7 +482,6 @@ export function newRound(s: CombatState, ctx: Ctx): Result {
     phase: "DRAWING",
     roundNumber: s.roundNumber + 1,
     participants,
-    currentTurnIndex: 0,
     drawnCards,
     deckSize: Math.max(deckSizeOf(participants), ...drawnCards),
     lastDraw: null,

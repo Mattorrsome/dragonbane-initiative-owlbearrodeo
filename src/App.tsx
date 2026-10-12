@@ -15,13 +15,17 @@ function App() {
   const [playerId, setPlayerId] = useState<string>("");
   const [theme, setTheme] = useState<Theme>("DARK");
   const [combatState, setCombatState] = useState<CombatState>(INITIAL_COMBAT_STATE);
-  const [swappingFrom, setSwappingFrom] = useState<string | null>(null);
+  // Swap pickers remember the table they were opened on; any turn/phase change closes them.
+  const [swapKey, setSwapKey] = useState<string | null>(null);
+  const [gmSwapPick, setGmSwapPick] = useState<{ id: string; key: string } | null>(null);
   const [partyPlayers, setPartyPlayers] = useState<Player[]>([]);
   const [editingNameId, setEditingNameId] = useState<string | null>(null);
   const [editingNameValue, setEditingNameValue] = useState("");
 
   const combatRef = useRef(combatState);
-  combatRef.current = combatState;
+  useEffect(() => {
+    combatRef.current = combatState;
+  });
 
   const ctx: Ctx = { role, playerId };
 
@@ -29,16 +33,22 @@ function App() {
   // read-modify-write window is milliseconds instead of "whatever this client last saw".
   const dispatch = useCallback(
     async (reducer: (s: CombatState) => Result): Promise<boolean> => {
-      const metadata = await OBR.room.getMetadata();
-      const current = combat.normalizeState(metadata[METADATA_KEY]);
-      const { state, error, notice } = reducer(current);
-      if (error) {
-        await OBR.notification.show(error, "WARNING");
+      try {
+        const metadata = await OBR.room.getMetadata();
+        const current = combat.normalizeState(metadata[METADATA_KEY]);
+        const { state, error, notice } = reducer(current);
+        if (error) {
+          await OBR.notification.show(error, "WARNING");
+          return false;
+        }
+        if (state !== current) await OBR.room.setMetadata({ [METADATA_KEY]: state });
+        if (notice) await OBR.notification.show(notice);
+        return true;
+      } catch (e) {
+        console.error(e);
+        await OBR.notification.show("Couldn't update combat, try again", "ERROR").catch(() => {});
         return false;
       }
-      if (state !== current) await OBR.room.setMetadata({ [METADATA_KEY]: state });
-      if (notice) await OBR.notification.show(notice);
-      return true;
     },
     []
   );
@@ -151,7 +161,13 @@ function App() {
   }, [isReady, role, playerId, dispatch]);
 
   const canControl = (participant: Participant): boolean => combat.canControl(participant, ctx);
-  const getDisplayName = combat.displayName;
+  const turnKey = `${combat.activeParticipant(combatState)?.id}|${combatState.phase}`;
+  const swapping = swapKey === turnKey;
+  const tableKey = `${combatState.phase}|${combatState.roundNumber}|${combatState.participants.length}`;
+  const gmSwapFirst =
+    gmSwapPick?.key === tableKey && combatState.participants.some((p) => p.id === gmSwapPick.id)
+      ? gmSwapPick.id
+      : null;
 
   // === ACTIONS ===
 
@@ -171,26 +187,25 @@ function App() {
     await run((s, c) => combat.startCombat(s, { participants }, c));
   };
 
-  const drawCard = (participantId: string) => {
-    const p = combatState.participants.find((x) => x.id === participantId);
-    return run((s, c) =>
-      p?.lightningFast
+  // Decide on the fresh state: Lightning Fast may have been toggled on another client.
+  const drawCard = (participantId: string) =>
+    run((s, c) =>
+      combat.findP(s, participantId)?.lightningFast
         ? combat.drawTwo(s, { id: participantId }, c)
         : combat.drawCard(s, { id: participantId }, c)
     );
-  };
 
   const drawAllCards = () => run((s, c) => combat.drawAll(s, c));
   const startRound = () => run((s, c) => combat.startRound(s, c));
   const act = () => run((s, c) => combat.act(s, c));
   const newRound = () => run((s, c) => combat.newRound(s, c));
 
-  const initiateSwap = (participantId: string) => setSwappingFrom(participantId);
-  const cancelSwap = () => setSwappingFrom(null);
+  const initiateSwap = () => setSwapKey(turnKey);
+  const cancelSwap = () => setSwapKey(null);
 
   const executeSwap = async (targetId: string) => {
     await run((s, c) => combat.swap(s, { targetId }, c));
-    setSwappingFrom(null);
+    setSwapKey(null);
   };
 
   const addFerocity = (participantId: string) =>
@@ -201,12 +216,7 @@ function App() {
   const removeParticipant = (participantId: string) =>
     run((s, c) => combat.removeParticipants(s, { ids: [participantId] }, c));
 
-  const endCombat = async () => {
-    if (role !== "GM") return;
-    await OBR.room.setMetadata({ [METADATA_KEY]: undefined });
-    setCombatState(INITIAL_COMBAT_STATE);
-    await OBR.notification.show("Combat ended");
-  };
+  const endCombat = () => run((s, c) => combat.endCombat(s, c));
 
   const addParticipants = async () => {
     const selection = await OBR.player.getSelection();
@@ -218,20 +228,6 @@ function App() {
     const participants = combat.buildParticipants(items, partyPlayers);
     await run((s, c) => combat.addParticipants(s, { participants }, c));
   };
-
-  const [gmSwapFirst, setGmSwapFirst] = useState<string | null>(null);
-
-  // Drop stale swap selections when the table changes underneath them.
-  useEffect(() => {
-    setGmSwapFirst(null);
-  }, [combatState.phase, combatState.roundNumber, combatState.participants.length]);
-  useEffect(() => {
-    setGmSwapFirst((f) => (f !== null && combatState.participants.some((p) => p.id === f) ? f : null));
-  }, [combatState.participants]);
-  const activeId = combat.activeParticipant(combatState)?.id;
-  useEffect(() => {
-    setSwappingFrom(null);
-  }, [activeId, combatState.phase]);
 
   const setLightningFast = (id: string, value: boolean) =>
     run((s, c) => combat.setLightningFast(s, { id, value }, c));
@@ -247,10 +243,10 @@ function App() {
   const gmSetCard = (id: string, card: number | null) =>
     run((s, c) => combat.gmSetCard(s, { id, card }, c));
   const gmSwapClick = async (id: string) => {
-    if (gmSwapFirst === null) return setGmSwapFirst(id);
-    if (gmSwapFirst === id) return setGmSwapFirst(null);
+    if (gmSwapFirst === null) return setGmSwapPick({ id, key: tableKey });
+    if (gmSwapFirst === id) return setGmSwapPick(null);
     const first = gmSwapFirst;
-    setGmSwapFirst(null);
+    setGmSwapPick(null);
     await run((s, c) => combat.gmSwapCards(s, { first, second: id }, c));
   };
 
@@ -313,14 +309,14 @@ function App() {
   {
     const tokensByName = new Map<string, string[]>();
     for (const p of combatState.participants) {
-      const n = getDisplayName(p);
+      const n = combat.displayName(p);
       const t = tokensByName.get(n) ?? [];
       if (!t.includes(p.tokenId)) tokensByName.set(n, [...t, p.tokenId]);
     }
     const dupes = new Map<string, number>();
     for (const [n, t] of tokensByName) if (t.length > 1) t.forEach((tok, i) => dupes.set(`${n}|${tok}`, i + 1));
     for (const p of combatState.participants) {
-      const k = `${getDisplayName(p)}|${p.tokenId}`;
+      const k = `${combat.displayName(p)}|${p.tokenId}`;
       if (dupes.has(k)) sameName.set(p.id, dupes.get(k)!);
     }
   }
@@ -360,7 +356,7 @@ function App() {
                 const who = combatState.participants.find(
                   (p) => p.id === combatState.lastDraw!.participantId
                 );
-                return who ? `${getDisplayName(who)} drew #${combatState.lastDraw.card}` : null;
+                return who ? `${combat.displayName(who)} drew #${combatState.lastDraw.card}` : null;
               })()}
             </div>
           )}
@@ -418,13 +414,13 @@ function App() {
                         onClick={() => {
                           if (isGM && combatState.phase === "DRAWING") {
                             setEditingNameId(p.id);
-                            setEditingNameValue(getDisplayName(p));
+                            setEditingNameValue(combat.displayName(p));
                           }
                         }}
                       >
-                        {getDisplayName(p)}
+                        {combat.displayName(p)}
                         {sameName.has(p.id) && ` #${sameName.get(p.id)}`}
-                        {fer && ` - ${fer.n}`}
+                        {fer && ` - Action ${fer.n}`}
                       </div>
                     )}
                     <div className="participant-status">{getParticipantStatusText(p)}</div>
@@ -449,7 +445,7 @@ function App() {
                           Surprise
                         </label>
                       )}
-                      {mine && combatState.phase === "ACTIVE" && (
+                      {mine && combatState.phase !== "DRAWING" && (
                         <label className="toggle">
                           <input
                             type="checkbox"
@@ -569,7 +565,7 @@ function App() {
           {/* Active Turn Actions */}
           {combatState.phase === "ACTIVE" && currentParticipant && canControl(currentParticipant) && (
             <div className="action-buttons sticky-actions">
-              {swappingFrom === null ? (
+              {!swapping ? (
                 <>
                   <button className="btn-primary btn-full" onClick={act}>
                     Act
@@ -577,7 +573,7 @@ function App() {
                   {validSwapTargets.length > 0 && (
                     <button
                       className="btn-secondary btn-full"
-                      onClick={() => initiateSwap(currentParticipant.id)}
+                      onClick={initiateSwap}
                     >
                       Wait
                     </button>
@@ -593,7 +589,7 @@ function App() {
                       onClick={() => executeSwap(t.id)}
                     >
                       <span className="initiative-card">{t.initiativeCard}</span>
-                      <span>{getDisplayName(t)}</span>
+                      <span>{combat.displayName(t)}</span>
                     </button>
                   ))}
                   <button className="btn-danger btn-full" onClick={cancelSwap}>

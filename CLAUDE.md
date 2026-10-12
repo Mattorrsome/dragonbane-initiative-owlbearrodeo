@@ -13,7 +13,8 @@ An Owlbear Rodeo extension that implements the Dragonbane RPG initiative system 
 - `npm run dev` — Start Vite dev server (add `http://localhost:5173/manifest.json` to Owlbear Rodeo to test)
 - `npm run build` — TypeScript check + Vite build (output in `dist/`)
 - `npm run preview` — Preview production build
-- `npm test` — Run Vitest unit tests for `src/combat.ts`. No linter is configured.
+- `npm test` — Run Vitest unit tests for `src/combat.ts`
+- `npm run lint` — ESLint (typescript-eslint + react-hooks). TypeScript is pinned to 6.x because typescript-eslint doesn't support TS 7 yet.
 
 ## Architecture
 
