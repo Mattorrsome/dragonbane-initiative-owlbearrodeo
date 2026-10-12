@@ -3,11 +3,11 @@ title: Draw Initiative for Dragonbane
 description: Initiative tracker using the Dragonbane RPG card-based system
 author: Gabe A.
 image: https://raw.githubusercontent.com/gabriel-aleixo/dragonbane-initiative-owlbearrodeo/master/docs/images/hero.jpg
-icon: https://drawinitiative.gabrielaleixo.com/icon.svg
+icon: https://cardinitiativefordragonbane.netlify.app/icon.svg
 tags:
   - combat
-manifest: https://drawinitiative.gabrielaleixo.com/manifest.json
-learn-more: https://drawinitiative.gabrielaleixo.com
+manifest: https://cardinitiativefordragonbane.netlify.app/manifest.json
+learn-more: https://cardinitiativefordragonbane.netlify.app
 ---
 
 # Draw Initiative for Dragonbane
@@ -59,7 +59,7 @@ All combat state is synced in real time through Owlbear Rodeo's room metadata. S
 
 ## Installation
 
-1. Copy the manifest URL: `https://drawinitiative.gabrielaleixo.com/manifest.json`
+1. Copy the manifest URL: `https://cardinitiativefordragonbane.netlify.app/manifest.json`
 2. In Owlbear Rodeo, open the extensions menu
 3. Paste the manifest URL and add the extension
 

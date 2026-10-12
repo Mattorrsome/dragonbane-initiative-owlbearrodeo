@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 An Owlbear Rodeo extension that implements the Dragonbane RPG initiative system — a card-based combat turn tracker where participants draw from a virtual deck of 1 to N cards (N = min(20, max(10, participants + Lightning Fast participants))) and can Act or Swap positions in turn order.
 
-**Live URL**: `https://drawinitiative.gabrielaleixo.com/manifest.json`
+**Live URL**: `https://cardinitiativefordragonbane.netlify.app/manifest.json`
 
 ## Commands
 
