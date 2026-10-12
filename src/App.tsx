@@ -19,6 +19,7 @@ function App() {
   const [swapKey, setSwapKey] = useState<string | null>(null);
   const [gmSwapPick, setGmSwapPick] = useState<{ id: string; key: string } | null>(null);
   const [partyPlayers, setPartyPlayers] = useState<Player[]>([]);
+  const [selectionCount, setSelectionCount] = useState(0);
   const [editingNameId, setEditingNameId] = useState<string | null>(null);
   const [editingNameValue, setEditingNameValue] = useState("");
 
@@ -74,6 +75,13 @@ function App() {
       setCombatState(combat.normalizeState(metadata[METADATA_KEY]));
     });
   }, []);
+
+  // Track the local player's token selection (initial value + live updates).
+  useEffect(() => {
+    if (!isReady) return;
+    OBR.player.getSelection().then((sel) => setSelectionCount(sel?.length ?? 0)).catch(console.error);
+    return OBR.player.onChange((p) => setSelectionCount(p.selection?.length ?? 0));
+  }, [isReady]);
 
   // Subscribe to metadata changes
   useEffect(() => {
@@ -337,8 +345,10 @@ function App() {
         <div className="empty-state">
           <p>No active combat</p>
           {isGM && (
-            <button className="btn-primary" onClick={startCombat}>
-              Start Combat
+            <button className="btn-primary" onClick={startCombat} disabled={selectionCount === 0}>
+              {selectionCount > 0
+                ? `Start Combat with ${selectionCount} selected`
+                : "Select tokens to start combat"}
             </button>
           )}
           {!isGM && <p>Waiting for GM to start combat</p>}
