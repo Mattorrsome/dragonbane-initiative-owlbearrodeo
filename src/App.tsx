@@ -347,7 +347,7 @@ function App() {
           {isGM && (
             <button className="btn-primary" onClick={startCombat} disabled={selectionCount === 0}>
               {selectionCount > 0
-                ? `Start Combat with ${selectionCount} selected`
+                ? `Start Combat with ${selectionCount} Combatants`
                 : "Select tokens to start combat"}
             </button>
           )}
