@@ -325,7 +325,7 @@ function App() {
     <div className={`app ${theme.toLowerCase()}`}>
       {/* Header */}
       <div className="header">
-        <h1>Draw Initiative</h1>
+        <h1>Dragonbane Initiative</h1>
         <span className="status-badge">
           {getStatusText()}
           {combatState.isActive && ` · Deck 1-${combatState.deckSize}`}
