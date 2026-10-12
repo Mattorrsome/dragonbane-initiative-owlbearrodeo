@@ -183,6 +183,6 @@ This project is not affiliated with, sponsored, or endorsed by Fria Ligan AB. Th
 
 ## License
 
-MIT
+MIT, see [LICENSE](LICENSE). Copyright (c) 2026 Gabriel Aleixo and Matt Orr.
 
 This project uses the [Owlbear Rodeo SDK](https://github.com/owlbear-rodeo/sdk), which is licensed under the MIT License.
