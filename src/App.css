@@ -325,7 +325,44 @@ button:disabled {
   opacity: 0.8;
 }
 
+/* Narrow popover: card + name on the first line, action buttons wrap onto their own line */
+.participant-row {
+  flex-wrap: wrap;
+}
+
 .participant-actions {
+  flex: 1 1 100%;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+/* Lightning Fast pair shown to everyone, e.g. "7 or 12" */
+.initiative-card.pending {
+  width: auto;
+  min-width: 28px;
+  padding: 0 6px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* Thin themed scrollbar */
+.scroll-area {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(187, 134, 252, 0.6) transparent;
+}
+.scroll-area::-webkit-scrollbar {
+  width: 6px;
+}
+.scroll-area::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scroll-area::-webkit-scrollbar-thumb {
+  background: rgba(187, 134, 252, 0.6);
+  border-radius: 3px;
+}
+.light .scroll-area {
+  scrollbar-color: rgba(98, 0, 238, 0.5) transparent;
+}
+.light .scroll-area::-webkit-scrollbar-thumb {
+  background: rgba(98, 0, 238, 0.5);
 }

@@ -27,7 +27,7 @@ The Dragonbane initiative system uses a virtual deck of cards numbered 1 up to N
 
 - **Lightning Fast**: toggle on a participant before drawing. They draw two cards and keep one.
 - **Surprise** (GM, round 1 only): the participant picks any free card before anyone else draws.
-- **Keep card next round** (Veteran): toggle at any time before "Draw New Round"; the participant keeps their final card.
+- **Keep** (Veteran, keep your card into the next round): toggle at any time before "Draw New Round"; the participant keeps their final card.
 - The extension does not check that a character actually has an ability.
 - The GM can swap two participants' cards (⇄), toggle Wait without exchanging cards, and set or clear any card.
 - The deck holds `min(20, max(10, participants + Lightning Fast participants))` cards; at 20 participants, adding more is disabled.

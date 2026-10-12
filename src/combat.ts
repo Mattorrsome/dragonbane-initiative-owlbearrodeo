@@ -339,16 +339,32 @@ export function drawAll(s: CombatState, ctx: Ctx): Result {
   if (waitingOnSurprise(s)) return reject(s, "Waiting for surprise picks");
   let drawn = s.drawnCards;
   let changed = false;
-  const participants = s.participants.map((p) => {
-    if (p.initiativeCard !== null || p.pendingCards || p.lightningFast) return p;
-    const free = freeCards({ deckSize: s.deckSize, drawnCards: drawn });
-    if (free.length === 0) return p;
+  const freeNow = () => freeCards({ deckSize: s.deckSize, drawnCards: drawn });
+  const patches = new Map<string, Partial<Participant>>();
+  const open = (p: Participant) => unheld(p) && !patches.has(p.id);
+
+  // Lightning Fast pairs first so single draws can't starve them. A pair that would leave
+  // someone without a card is skipped (same rule as drawTwo); the GM resolves it by hand.
+  for (const p of s.participants.filter((x) => x.lightningFast && open(x))) {
+    const free = freeNow();
+    const othersOpen = s.participants.filter((x) => x.id !== p.id && open(x)).length;
+    if (free.length - 2 < othersOpen) continue;
+    const first = pick(free, ctx);
+    const second = pick(free.filter((card) => card !== first), ctx);
+    drawn = [...drawn, first, second];
+    patches.set(p.id, { pendingCards: [first, second] });
+    changed = true;
+  }
+  for (const p of s.participants.filter((x) => !x.lightningFast && open(x))) {
+    const free = freeNow();
+    if (free.length === 0) break;
     const card = pick(free, ctx);
     drawn = [...drawn, card];
+    patches.set(p.id, { initiativeCard: card });
     changed = true;
-    return { ...p, initiativeCard: card };
-  });
+  }
   if (!changed) return reject(s, "Nobody left to draw for");
+  const participants = s.participants.map((p) => (patches.has(p.id) ? { ...p, ...patches.get(p.id) } : p));
   return ok({ ...s, participants, drawnCards: drawn, lastDraw: null });
 }
 

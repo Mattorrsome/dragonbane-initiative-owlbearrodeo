@@ -51,7 +51,7 @@ The GM sees full controls — add/remove participants, start rounds, and manage 
 
 ### Abilities and GM Tools
 
-Toggle **Lightning Fast** (draw two cards, keep one), **Surprise** (GM, round 1: pick any free card first) and **Keep card next round** (Veteran) per participant; the GM can also swap cards, toggle Wait, and set or clear any card. The extension does not check that a character has an ability.
+Toggle **Lightning Fast** (draw two cards, keep one), **Surprise** (GM, round 1: pick any free card first) and **Keep** (Veteran: keep your card into the next round) per participant; the GM can also swap cards, toggle Wait, and set or clear any card. The extension does not check that a character has an ability.
 
 ### Real-Time Sync
 

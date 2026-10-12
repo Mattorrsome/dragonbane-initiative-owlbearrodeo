@@ -350,12 +350,13 @@ describe("Lightning Fast", () => {
     expect(c.chooseOne(s, { id: "a", card: 1 }, P1).state).toBe(s);
   });
 
-  it("drawCard rejects an LF participant and drawAll skips them", () => {
+  it("drawCard rejects an LF participant; drawAll deals their pair first", () => {
     const s = lf([mkP("b")]);
     expect(c.drawCard(s, { id: "a" }, GM).error).toBeDefined();
     const r = c.drawAll(s, GM).state;
-    expect(r.participants[0]).toMatchObject({ initiativeCard: null, pendingCards: null });
-    expect(r.participants[1].initiativeCard).toBe(1);
+    expect(r.participants[0]).toMatchObject({ initiativeCard: null, pendingCards: [1, 2] });
+    expect(r.participants[1].initiativeCard).toBe(3);
+    expect(r.drawnCards).toEqual([1, 2, 3]);
   });
 
   it("drawTwo rejects when it would leave others without a card", () => {

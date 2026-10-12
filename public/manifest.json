@@ -1,8 +1,8 @@
 {
   "manifest_version": 1,
   "name": "Draw Initiative for Dragonbane",
-  "version": "1.1.0",
-  "author": "Gabe A.",
+  "version": "2.0.0",
+  "author": "Gabe A. & Matt Orr",
   "description": "Initiative tracker using the Dragonbane RPG card-based system",
   "icon": "/icon.svg",
   "action": {

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import OBR, { Player } from "@owlbear-rodeo/sdk";
 import { CombatState, Participant, INITIAL_COMBAT_STATE, METADATA_KEY } from "./types";
 import * as combat from "./combat";
@@ -17,6 +17,9 @@ function App() {
   const [partyPlayers, setPartyPlayers] = useState<Player[]>([]);
   const [editingNameId, setEditingNameId] = useState<string | null>(null);
   const [editingNameValue, setEditingNameValue] = useState("");
+
+  const combatRef = useRef(combatState);
+  combatRef.current = combatState;
 
   const ctx: Ctx = { role, playerId };
 
@@ -64,8 +67,13 @@ function App() {
   useEffect(() => {
     if (!isReady) return;
 
+    // Tell non-GM clients when combat starts/ends (the acting GM already gets a local toast).
     const unsubMetadata = OBR.room.onMetadataChange((metadata) => {
-      setCombatState(combat.normalizeState(metadata[METADATA_KEY]));
+      const next = combat.normalizeState(metadata[METADATA_KEY]);
+      if (role !== "GM" && next.isActive !== combatRef.current.isActive) {
+        OBR.notification.show(next.isActive ? "Combat started" : "Combat ended").catch(console.error);
+      }
+      setCombatState(next);
     });
     const unsubTheme = OBR.theme.onChange((t) => setTheme(t.mode));
     const unsubParty = OBR.party.onChange((p) => setPartyPlayers(p));
@@ -75,7 +83,7 @@ function App() {
       unsubTheme();
       unsubParty();
     };
-  }, [isReady]);
+  }, [isReady, role]);
 
   // Watch for deleted tokens (GM client only, created once, independent of combat state).
   // A token only counts as deleted if we saw it in the scene and it is now gone, so a
@@ -334,6 +342,7 @@ function App() {
                 canControl(p);
               const drawing = combatState.phase === "DRAWING";
               const unheld = p.initiativeCard === null && !p.pendingCards;
+              const pair = p.pendingCards ? [...p.pendingCards].sort((a, b) => a - b) : null;
               const mine = canControl(p);
               const free = combat.freeCards(combatState);
               const atCap = combatState.participants.length >= combat.MAX_PARTICIPANTS;
@@ -346,8 +355,12 @@ function App() {
                   } ${p.status === "WAITED" ? "waited" : ""}`}
                 >
                   {/* Initiative Card */}
-                  <div className={`initiative-card ${p.initiativeCard === null ? "empty" : ""}`}>
-                    {p.initiativeCard ?? "?"}
+                  <div
+                    className={`initiative-card ${p.initiativeCard === null ? "empty" : ""} ${
+                      pair ? "pending" : ""
+                    }`}
+                  >
+                    {pair ? `${pair[0]} or ${pair[1]}` : p.initiativeCard ?? "?"}
                   </div>
 
                   {/* Info */}
@@ -399,14 +412,14 @@ function App() {
                           Surprise
                         </label>
                       )}
-                      {mine && (
+                      {mine && combatState.phase === "ACTIVE" && (
                         <label className="toggle">
                           <input
                             type="checkbox"
                             checked={p.retainNext}
                             onChange={(e) => setRetainNext(p.id, e.target.checked)}
                           />
-                          Keep card next round
+                          Keep
                         </label>
                       )}
                     </div>
@@ -435,7 +448,7 @@ function App() {
                     )}
                     {p.pendingCards && mine && (
                       <>
-                        {p.pendingCards.map((card) => (
+                        {pair!.map((card) => (
                           <button
                             key={card}
                             className="btn-primary btn-small"
@@ -461,7 +474,16 @@ function App() {
                       </select>
                     )}
 
-                    {isGM && combatState.phase !== "ROUND_COMPLETE" && (
+                    {isGM && combatState.phase === "ACTIVE" && p.status !== "ACTED" && (
+                      <button
+                        className="btn-secondary btn-small"
+                        onClick={() => gmWait(p.id)}
+                        title="Toggle Wait without exchanging cards"
+                      >
+                        {p.status === "WAITED" ? "Unwait" : "Wait"}
+                      </button>
+                    )}
+                    {isGM && drawing && allDrawn && (
                       <>
                         <button
                           className={`btn-secondary btn-small ${gmSwapFirst === p.id ? "selected" : ""}`}
@@ -470,15 +492,6 @@ function App() {
                         >
                           ⇄
                         </button>
-                        {combatState.phase === "ACTIVE" && p.status !== "ACTED" && (
-                          <button
-                            className="btn-secondary btn-small"
-                            onClick={() => gmWait(p.id)}
-                            title="Toggle Wait without exchanging cards"
-                          >
-                            {p.status === "WAITED" ? "Unwait" : "Wait"}
-                          </button>
-                        )}
                         {!p.pendingCards && (
                           <select
                             className="card-select"
