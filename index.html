@@ -61,16 +61,71 @@
         </div>
       </section>
 
+      <!-- What's New -->
+      <section class="section" id="whats-new">
+        <h2 class="chapter-title">What's New</h2>
+        <div class="segment">
+          <div class="segment-full">
+            <p>This version builds on Gabriel Aleixo's original extension with more of the Dragonbane rules, more GM tools and a smoother table experience.</p>
+          </div>
+        </div>
+        <div class="segment">
+          <div class="segment-col">
+            <h3>Dragonbane Abilities</h3>
+            <ul>
+              <li><strong>Lightning Fast:</strong> tick it before drawing. The participant draws two cards and keeps the one they want; the other goes back in the deck</li>
+              <li><strong>Surprise</strong> (round 1): the participant picks any free card before anyone else draws</li>
+              <li><strong>Keep</strong> (Veteran): tick it any time after drawing to keep your final card into the next round</li>
+              <li>The extension doesn't check that a character actually has the ability</li>
+            </ul>
+
+            <h3>A Deck That Grows</h3>
+            <p>The deck holds 1 to N cards, where N is the number of participants plus one extra card per Lightning Fast participant, at least 10 and at most 20. The header shows the current deck size.</p>
+          </div>
+          <div class="segment-col">
+            <h3>GM Tools</h3>
+            <ul>
+              <li><strong>⇄ Swap:</strong> exchange any two participants' cards</li>
+              <li><strong>Set…:</strong> set or clear any participant's card</li>
+              <li><strong>Wait / Unwait:</strong> toggle Wait on anyone without exchanging cards</li>
+              <li><strong>Any player can edit:</strong> a checkbox shown before combat starts (see below)</li>
+            </ul>
+
+            <h3>Smoother Play</h3>
+            <ul>
+              <li>The initiative window opens for every player when combat starts</li>
+              <li>The Start Combat button shows how many tokens are selected, and clears the map selection once combat starts</li>
+              <li>A "drew #N" line shows the latest draw</li>
+              <li>Deleting a token from the map removes it from combat; switching scenes never does</li>
+              <li>Different tokens with the same name are numbered #1, #2, …</li>
+            </ul>
+          </div>
+        </div>
+        <div class="segment">
+          <div class="segment-full">
+            <div class="dragonbox">
+              <h4>Any Player Can Edit</h4>
+              <p>Normally players can only use the controls on their own tokens. If player tokens aren't assigned to players in Owlbear Rodeo, tick <strong>"Any player can edit"</strong> before clicking Start Combat. Every player can then, for any participant:</p>
+              <ul>
+                <li>Toggle Lightning Fast, Surprise and Keep</li>
+                <li>Draw cards, pick a Surprise card and choose a Lightning Fast card</li>
+              </ul>
+              <p>Taking turns (Act and Wait) still belongs to the token's owner or the GM. The setting is remembered in the GM's browser for the next combat.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- How It Works -->
       <section class="section" id="how-it-works">
         <h2 class="chapter-title">How It Works</h2>
         <div class="segment">
           <div class="segment-col">
             <h3>The Card System</h3>
-            <p>The Dragonbane initiative system uses a virtual deck of 10 cards numbered 1-10:</p>
+            <p>The Dragonbane initiative system uses a virtual deck of numbered cards, 1-10 for most fights and up to 1-20 for big ones:</p>
             <ul>
               <li>At the start of each round, participants draw cards from the deck</li>
-              <li>Turn order goes from <strong>lowest</strong> (1) to <strong>highest</strong> (10)</li>
+              <li>Turn order goes from <strong>lowest</strong> (1) to <strong>highest</strong></li>
               <li>On your turn, you can <strong>Act</strong> (take your turn) or <strong>Wait</strong> (exchange cards with someone else)</li>
             </ul>
           </div>
@@ -81,6 +136,8 @@
                 <li>You can only swap initiative cards with participants who haven't acted yet</li>
                 <li>This means you can only swap initiative cards with participants who have a higher initiative number than you</li>
                 <li>After waiting, you're marked as "Waited" and can no longer be a swap target</li>
+                <li>NPCs can wait too; the GM controls them</li>
+                <li>Monsters can also wait in the extension. This is technically against the Dragonbane rules, but was added for ease of use</li>
               </ul>
             </div>
           </div>
@@ -114,13 +171,16 @@
             <ol>
               <li>Open the Card Initiative for Dragonbane extension</li>
               <li>Select tokens on the map that will participate in combat</li>
-              <li>Click <strong>"Start Combat"</strong></li>
+              <li>Optionally tick <strong>"Any player can edit"</strong> (see What's New)</li>
+              <li>Click <strong>"Start Combat with N Combatants"</strong></li>
             </ol>
 
             <h3>Drawing Phase</h3>
             <ul>
               <li>Each player draws their own card by clicking <strong>"Draw"</strong> next to their character</li>
+              <li>Tick <strong>Lightning Fast</strong> or <strong>Surprise</strong> before anyone draws</li>
               <li>Use <strong>"Draw All Cards"</strong> to auto-assign cards to participants who haven't drawn</li>
+              <li>Once everyone has a card, use <strong>⇄</strong> and <strong>Set…</strong> to fix cards if needed</li>
               <li>Click <strong>"Start Round"</strong> once all cards are drawn</li>
             </ul>
           </div>
@@ -129,12 +189,13 @@
             <ul>
               <li><strong>Add Participants:</strong> Select new tokens and click "Add Participants" (only during drawing phase)</li>
               <li><strong>Edit Names:</strong> Click the name of a participant to edit it (only during drawing phase)</li>
-              <li><strong>Remove Participants:</strong> Click the ✕ button next to any participant (anytime)</li>
+              <li><strong>Remove Participants:</strong> Click the ✕ button next to any participant (anytime). This removes all of a monster's Ferocity entries too</li>
+              <li><strong>Wait / Unwait:</strong> Toggle Wait on anyone during the round, without exchanging cards</li>
               <li><strong>End Combat:</strong> Click "End Combat" to clear all combat state</li>
             </ul>
 
             <h3>Round Completion</h3>
-            <p>When all participants have acted, click <strong>"Draw New Round"</strong> to start fresh draws.</p>
+            <p>When all participants have acted, click <strong>"Draw New Round"</strong> to start fresh draws. Anyone with <strong>Keep</strong> ticked keeps their card.</p>
           </div>
         </div>
       </section>
@@ -149,10 +210,11 @@
               <ol>
                 <li>During the <strong>drawing phase</strong>, click <strong>"+Ferocity"</strong> next to a GM-controlled token</li>
                 <li>This creates a duplicate entry in the initiative list</li>
-                <li>Each entry draws its own initiative card</li>
+                <li>Each entry draws its own initiative card and inherits Lightning Fast</li>
+                <li>A monster's entries share a coloured border and are labelled "Action 1", "Action 2", … in turn order</li>
                 <li>Click "+Ferocity" multiple times for Ferocity 3, 4, etc.</li>
               </ol>
-              <p>The duplicate entries share the same token on the map — only the initiative tracking is duplicated. If the token is removed from the map, all its Ferocity entries are also removed.</p>
+              <p>The duplicate entries share the same token on the map — only the initiative tracking is duplicated. If the token is removed from the map, or you click ✕ on any of its entries, all its Ferocity entries are removed.</p>
             </div>
           </div>
         </div>
@@ -165,7 +227,9 @@
           <div class="segment-col">
             <h3>Drawing Phase</h3>
             <ul>
-              <li>Click <strong>"Draw"</strong> next to your character to draw an initiative card</li>
+              <li>Tick <strong>Lightning Fast</strong> first if your character has it, then click <strong>"Draw 2"</strong> and choose one card</li>
+              <li>Otherwise click <strong>"Draw"</strong> next to your character to draw an initiative card</li>
+              <li>If you have <strong>Surprise</strong>, pick any free card from the list before anyone else draws</li>
               <li>Wait for the GM to start the round</li>
             </ul>
           </div>
@@ -175,6 +239,7 @@
             <ul>
               <li>Click <strong>"Act"</strong> to complete your turn</li>
               <li>Click <strong>"Wait"</strong> to exchange initiative cards with another participant (see waiting rules above)</li>
+              <li>Tick <strong>Keep</strong> (Veteran) to keep your card for the next round</li>
             </ul>
           </div>
         </div>
@@ -212,6 +277,22 @@
                 <tr>
                   <td>Teal left border</td>
                   <td>"Waited" status (waited, cannot be swap target)</td>
+                </tr>
+                <tr>
+                  <td>"3 or 7" card</td>
+                  <td>Lightning Fast participant choosing between two cards</td>
+                </tr>
+                <tr>
+                  <td>Coloured border, "Action N"</td>
+                  <td>Ferocity entries of the same monster</td>
+                </tr>
+                <tr>
+                  <td>Name with #1, #2</td>
+                  <td>Different tokens with the same name</td>
+                </tr>
+                <tr>
+                  <td>"Deck 1-N" in the header</td>
+                  <td>Current deck size</td>
                 </tr>
               </tbody>
             </table>

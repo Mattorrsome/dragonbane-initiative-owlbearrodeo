@@ -7,6 +7,8 @@ import type { Ctx, Result } from "./combat";
 type Role = "GM" | "PLAYER";
 type Theme = "DARK" | "LIGHT";
 
+const ANY_EDIT_KEY = "com.dragonbane-initiative/any-player-can-edit";
+
 const FEROCITY_COLORS = ["#ff7043", "#42a5f5", "#66bb6a", "#ffca28", "#ec407a", "#26c6da"];
 
 function App() {
@@ -22,6 +24,8 @@ function App() {
   const [selectionCount, setSelectionCount] = useState(0);
   const [editingNameId, setEditingNameId] = useState<string | null>(null);
   const [editingNameValue, setEditingNameValue] = useState("");
+  // GM preference, remembered per browser and copied into combat state at start.
+  const [anyPlayerCanEdit, setAnyPlayerCanEdit] = useState(() => localStorage.getItem(ANY_EDIT_KEY) === "true");
 
   const combatRef = useRef(combatState);
   useEffect(() => {
@@ -192,7 +196,8 @@ function App() {
     }
     const items = await OBR.scene.items.getItems(selection);
     const participants = combat.buildParticipants(items, partyPlayers);
-    if (await run((s, c) => combat.startCombat(s, { participants }, c))) await OBR.player.deselect();
+    if (await run((s, c) => combat.startCombat(s, { participants, anyPlayerCanEdit }, c)))
+      await OBR.player.deselect();
   };
 
   // Decide on the fresh state: Lightning Fast may have been toggled on another client.
@@ -221,8 +226,9 @@ function App() {
       combat.addFerocity(s, { id: participantId, newId: crypto.randomUUID() }, c)
     );
 
-  const removeParticipant = (participantId: string) =>
-    run((s, c) => combat.removeParticipants(s, { ids: [participantId] }, c));
+  // Removes every row of the token, so Ferocity duplicates go with it.
+  const removeToken = (tokenId: string) =>
+    run((s, c) => combat.removeParticipants(s, { ids: combat.participantIdsForTokens(s, [tokenId]) }, c));
 
   const endCombat = () => run((s, c) => combat.endCombat(s, c));
 
@@ -345,9 +351,26 @@ function App() {
         <div className="empty-state">
           <p>No active combat</p>
           {isGM && (
+            <label
+              className="toggle"
+              style={{ paddingBottom: "2em" }}
+              title="When checked, every player can toggle Lightning Fast, Surprise and Keep (Veteran), draw cards, pick Surprise cards and choose Lightning Fast cards for any participant, even tokens not assigned to them. Otherwise only the GM and a token's owner can. Remembered on this browser for future combats."
+            >
+              <input
+                type="checkbox"
+                checked={anyPlayerCanEdit}
+                onChange={(e) => {
+                  setAnyPlayerCanEdit(e.target.checked);
+                  localStorage.setItem(ANY_EDIT_KEY, String(e.target.checked));
+                }}
+              />
+              Any player can edit
+            </label>
+          )}
+          {isGM && (
             <button className="btn-primary" onClick={startCombat} disabled={selectionCount === 0}>
               {selectionCount > 0
-                ? `Start Combat with ${selectionCount} Combatants`
+                ? `Start Combat with ${selectionCount} Combatant${selectionCount === 1 ? "" : "s"}`
                 : "Select tokens to start combat"}
             </button>
           )}
@@ -378,11 +401,12 @@ function App() {
                 p.initiativeCard === null &&
                 !p.pendingCards &&
                 !p.surprise &&
-                canControl(p);
+                (canControl(p) || combatState.anyPlayerCanEdit);
               const drawing = combatState.phase === "DRAWING";
               const unheld = p.initiativeCard === null && !p.pendingCards;
               const pair = p.pendingCards ? [...p.pendingCards].sort((a, b) => a - b) : null;
               const mine = canControl(p);
+              const editable = mine || combatState.anyPlayerCanEdit;
               const free = combat.freeCards(combatState);
               const atCap = combatState.participants.length >= combat.MAX_PARTICIPANTS;
               const fer = ferocity.get(p.id);
@@ -435,7 +459,7 @@ function App() {
                     )}
                     <div className="participant-status">{getParticipantStatusText(p)}</div>
                     <div className="toggle-row">
-                      {drawing && unheld && mine && (
+                      {drawing && unheld && editable && (
                         <label className="toggle">
                           <input
                             type="checkbox"
@@ -445,7 +469,7 @@ function App() {
                           Lightning Fast
                         </label>
                       )}
-                      {isGM && drawing && unheld && combatState.roundNumber === 1 && (
+                      {(isGM || combatState.anyPlayerCanEdit) && drawing && unheld && combatState.roundNumber === 1 && (
                         <label className="toggle">
                           <input
                             type="checkbox"
@@ -455,7 +479,7 @@ function App() {
                           Surprise
                         </label>
                       )}
-                      {mine && combatState.phase !== "DRAWING" && (
+                      {editable && combatState.phase !== "DRAWING" && (
                         <label className="toggle">
                           <input
                             type="checkbox"
@@ -489,7 +513,7 @@ function App() {
                         {p.lightningFast ? "Draw 2" : "Draw"}
                       </button>
                     )}
-                    {p.pendingCards && mine && (
+                    {p.pendingCards && editable && (
                       <>
                         {pair!.map((card) => (
                           <button
@@ -502,7 +526,7 @@ function App() {
                         ))}
                       </>
                     )}
-                    {p.surprise && p.initiativeCard === null && mine && (
+                    {p.surprise && p.initiativeCard === null && editable && (
                       <select
                         className="card-select"
                         value=""
@@ -560,8 +584,8 @@ function App() {
                     {isGM && (
                       <button
                         className="btn-danger btn-small"
-                        onClick={() => removeParticipant(p.id)}
-                        title="Remove"
+                        onClick={() => removeToken(p.tokenId)}
+                        title={fer ? "Remove (all Ferocity actions)" : "Remove"}
                       >
                         ✕
                       </button>

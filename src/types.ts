@@ -24,6 +24,7 @@ export interface CombatState {
   drawnCards: number[]; // every taken card, incl. reserved pairs and kept cards
   deckSize: number;
   lastDraw: { participantId: string; card: number } | null;
+  anyPlayerCanEdit: boolean; // players may toggle abilities and draw for any participant
 }
 
 export const INITIAL_COMBAT_STATE: CombatState = {
@@ -34,6 +35,7 @@ export const INITIAL_COMBAT_STATE: CombatState = {
   drawnCards: [],
   deckSize: 10,
   lastDraw: null,
+  anyPlayerCanEdit: false,
 };
 
 export const METADATA_KEY = "com.dragonbane-initiative/combat-state";

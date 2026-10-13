@@ -29,6 +29,10 @@ export const reject = (state: CombatState, error: string): Result => ({ state, e
 export const canControl = (p: Participant, ctx: Ctx): boolean =>
   ctx.role === "GM" || p.controlledBy === ctx.playerId;
 
+/** Abilities and draws: the controller, or anyone when the GM allows it. */
+const canEdit = (s: CombatState, p: Participant, ctx: Ctx): boolean =>
+  s.anyPlayerCanEdit || canControl(p, ctx);
+
 export const displayName = (p: Participant): string => p.customName || p.name;
 
 export const findP = (s: CombatState, id: string): Participant | undefined =>
@@ -153,7 +157,11 @@ export function buildParticipants(
 const gmOnly = (s: CombatState, ctx: Ctx, what: string): Result | null =>
   ctx.role === "GM" ? null : reject(s, `Only the GM can ${what}`);
 
-export function startCombat(s: CombatState, a: { participants: Participant[] }, ctx: Ctx): Result {
+export function startCombat(
+  s: CombatState,
+  a: { participants: Participant[]; anyPlayerCanEdit?: boolean },
+  ctx: Ctx
+): Result {
   const denied = gmOnly(s, ctx, "start combat");
   if (denied) return denied;
   if (s.isActive) return reject(s, "Combat is already running");
@@ -168,6 +176,7 @@ export function startCombat(s: CombatState, a: { participants: Participant[] }, 
       roundNumber: 1,
       participants: a.participants,
       deckSize: deckSizeOf(a.participants),
+      anyPlayerCanEdit: a.anyPlayerCanEdit ?? false,
     },
     "Combat started!"
   );
@@ -297,7 +306,7 @@ export function removeParticipants(s: CombatState, a: { ids: string[] }, ctx: Ct
     participants: s.participants.filter((p) => !a.ids.includes(p.id)),
     drawnCards: s.drawnCards.filter((card) => !released.has(card)),
   });
-  return ok(next, `${gone.map(displayName).join(", ")} removed from combat`);
+  return ok(next, `${[...new Set(gone.map(displayName))].join(", ")} removed from combat`);
 }
 
 /** Every participant entry (incl. Ferocity duplicates) backed by one of these tokens. */
@@ -312,7 +321,7 @@ export const waitingOnSurprise = (s: CombatState): boolean =>
 export function drawBlock(s: CombatState, p: Participant | undefined, ctx: Ctx): string | null {
   if (!p) return "Participant not found";
   if (s.phase !== "DRAWING") return "Cards can only be drawn while drawing";
-  if (!canControl(p, ctx)) return "You don't control that participant";
+  if (!canEdit(s, p, ctx)) return "You don't control that participant";
   if (p.initiativeCard !== null || p.pendingCards) return "Already has a card";
   return null;
 }
@@ -379,7 +388,7 @@ export function setLightningFast(
 ): Result {
   const p = findP(s, a.id);
   if (!p) return reject(s, "Participant not found");
-  if (!canControl(p, ctx)) return reject(s, "You don't control that participant");
+  if (!canEdit(s, p, ctx)) return reject(s, "You don't control that participant");
   if (s.phase !== "DRAWING" || !unheld(p))
     return reject(s, "Lightning Fast can only change before drawing");
   const next = mapP(s, a.id, (x) => ({ ...x, lightningFast: a.value }));
@@ -411,7 +420,7 @@ export function drawTwo(s: CombatState, a: { id: string }, ctx: Ctx): Result {
 export function chooseOne(s: CombatState, a: { id: string; card: number }, ctx: Ctx): Result {
   const p = findP(s, a.id);
   if (!p || !p.pendingCards) return reject(s, "Nothing to choose");
-  if (!canControl(p, ctx)) return reject(s, "You don't control that participant");
+  if (!canEdit(s, p, ctx)) return reject(s, "You don't control that participant");
   if (!p.pendingCards.includes(a.card)) return reject(s, "Pick one of the two drawn cards");
   const other = p.pendingCards[0] === a.card ? p.pendingCards[1] : p.pendingCards[0];
   return ok({
@@ -426,8 +435,7 @@ export function setSurprise(
   a: { id: string; value: boolean },
   ctx: Ctx
 ): Result {
-  const denied = gmOnly(s, ctx, "set Surprise");
-  if (denied) return denied;
+  if (ctx.role !== "GM" && !s.anyPlayerCanEdit) return reject(s, "Only the GM can set Surprise");
   const p = findP(s, a.id);
   if (!p) return reject(s, "Participant not found");
   if (s.roundNumber !== 1) return reject(s, "Surprise only applies in round 1");
@@ -460,7 +468,7 @@ export function setRetainNext(
 ): Result {
   const p = findP(s, a.id);
   if (!p) return reject(s, "Participant not found");
-  if (!canControl(p, ctx)) return reject(s, "You don't control that participant");
+  if (!canEdit(s, p, ctx)) return reject(s, "You don't control that participant");
   return ok(mapP(s, a.id, (x) => ({ ...x, retainNext: a.value })));
 }
 

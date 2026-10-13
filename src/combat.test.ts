@@ -42,6 +42,7 @@ export function mkS(ps: Participant[], over: Partial<CombatState> = {}): CombatS
     drawnCards: drawn,
     deckSize: c.deckSizeOf(ps),
     lastDraw: null,
+    anyPlayerCanEdit: false,
     ...over,
   });
 }
@@ -412,6 +413,35 @@ describe("Surprise", () => {
     expect(c.pickSurpriseCard(s, { id: "a", card: 3 }, GM).error).toBeDefined();
     expect(c.pickSurpriseCard(s, { id: "a", card: 11 }, GM).error).toBeDefined();
     expect(c.pickSurpriseCard(s, { id: "c", card: 5 }, GM).error).toBeDefined();
+  });
+});
+
+describe("Any player can edit", () => {
+  it("lets players toggle Lightning Fast, Surprise and Keep on tokens they don't control", () => {
+    const off = mkS([mkP("b")]);
+    const on = mkS([mkP("b")], { anyPlayerCanEdit: true });
+    expect(c.setLightningFast(off, { id: "b", value: true }, P1).error).toBeDefined();
+    expect(c.setSurprise(off, { id: "b", value: true }, P1).error).toBeDefined();
+    expect(c.setRetainNext(off, { id: "b", value: true }, P1).error).toBeDefined();
+    expect(c.setLightningFast(on, { id: "b", value: true }, P1).state.participants[0].lightningFast).toBe(true);
+    expect(c.setSurprise(on, { id: "b", value: true }, P1).state.participants[0].surprise).toBe(true);
+    expect(c.setRetainNext(on, { id: "b", value: true }, P1).state.participants[0].retainNext).toBe(true);
+  });
+
+  it("lets players draw, pick Surprise and choose Lightning Fast cards for any token", () => {
+    const off = mkS([mkP("b"), mkP("s", { surprise: true }), mkP("l", { pendingCards: [2, 5] })]);
+    const on = { ...off, anyPlayerCanEdit: true };
+    expect(c.drawCard(mkS([mkP("b")]), { id: "b" }, P1).error).toBeDefined();
+    expect(c.drawCard(mkS([mkP("b")], { anyPlayerCanEdit: true }), { id: "b" }, P1).state.participants[0].initiativeCard).not.toBeNull();
+    expect(c.pickSurpriseCard(off, { id: "s", card: 7 }, P1).error).toBeDefined();
+    expect(c.pickSurpriseCard(on, { id: "s", card: 7 }, P1).state.participants[1].initiativeCard).toBe(7);
+    expect(c.chooseOne(off, { id: "l", card: 5 }, P1).error).toBeDefined();
+    expect(c.chooseOne(on, { id: "l", card: 5 }, P1).state.participants[2].initiativeCard).toBe(5);
+  });
+
+  it("startCombat stores the flag", () => {
+    const s = c.startCombat(INITIAL_COMBAT_STATE, { participants: [mkP("a")], anyPlayerCanEdit: true }, GM).state;
+    expect(s.anyPlayerCanEdit).toBe(true);
   });
 });
 
