@@ -354,38 +354,36 @@ function App() {
         <div className="empty-state">
           <p>No active combat</p>
           {isGM && (
-            <label
-              className="toggle"
-              style={{ paddingBottom: "0.5em" }}
-              title="When checked, every player can toggle Lightning Fast, Surprise and Keep (Veteran), draw cards, pick Surprise cards and choose Lightning Fast cards for any participant, even tokens not assigned to them. Otherwise only the GM and a token's owner can. Remembered on this browser for future combats."
-            >
-              <input
-                type="checkbox"
-                checked={anyPlayerCanEdit}
-                onChange={(e) => {
-                  setAnyPlayerCanEdit(e.target.checked);
-                  localStorage.setItem(ANY_EDIT_KEY, String(e.target.checked));
-                }}
-              />
-              Any player can edit
-            </label>
-          )}
-          {isGM && (
-            <label
-              className="toggle"
-              style={{ paddingBottom: "2em" }}
-              title="When checked, rows show the name of the player who controls the token instead of the token's name. Falls back to the token's name for GM tokens or when that player isn't in the room. Remembered on this browser for future combats."
-            >
-              <input
-                type="checkbox"
-                checked={takePlayerName}
-                onChange={(e) => {
-                  setTakePlayerName(e.target.checked);
-                  localStorage.setItem(PLAYER_NAME_KEY, String(e.target.checked));
-                }}
-              />
-              Take player name
-            </label>
+            <div className="start-options">
+              <label
+                className="toggle"
+                title="When checked, every player can toggle Lightning Fast, Surprise and Keep Card (Veteran), draw cards, pick Surprise cards and choose Lightning Fast cards for any participant, even tokens not assigned to them. Otherwise only the GM and a token's owner can. Remembered on this browser for future combats."
+              >
+                <input
+                  type="checkbox"
+                  checked={anyPlayerCanEdit}
+                  onChange={(e) => {
+                    setAnyPlayerCanEdit(e.target.checked);
+                    localStorage.setItem(ANY_EDIT_KEY, String(e.target.checked));
+                  }}
+                />
+                Players can Alter Any Action
+              </label>
+              <label
+                className="toggle"
+                title="When checked, rows show the name of the player who controls the token instead of the token's name. Falls back to the token's name for GM tokens or when that player isn't in the room. Remembered on this browser for future combats."
+              >
+                <input
+                  type="checkbox"
+                  checked={takePlayerName}
+                  onChange={(e) => {
+                    setTakePlayerName(e.target.checked);
+                    localStorage.setItem(PLAYER_NAME_KEY, String(e.target.checked));
+                  }}
+                />
+                Use Player Name
+              </label>
+            </div>
           )}
           {isGM && (
             <button className="btn-primary" onClick={startCombat} disabled={selectionCount === 0}>
@@ -506,7 +504,7 @@ function App() {
                             checked={p.retainNext}
                             onChange={(e) => setRetainNext(p.id, e.target.checked)}
                           />
-                          Keep
+                          Keep Card
                         </label>
                       )}
                     </div>

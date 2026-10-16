@@ -25,7 +25,7 @@ On their turn, a participant can choose one of two actions:
    - After swapping, the player who initiated the swap is marked as "waited" and can NO LONGER be a swap target for the rest of the round
    - The recipient of the swap can also choose to swap (but not back with the person who just swapped with them, since they are marked as "waited")
 
-3. **Parry/Evade** (out of turn): a participant who is not active, has not acted and holds a card can Parry or Evade. This spends their action: they are marked "acted" and their turn is skipped. Turn order is otherwise unchanged. Available to the GM and the token's controller (anyone when "Any player can edit" is on). With Ferocity, each row is a separate action. Not available on the active participant.
+3. **Parry/Evade** (out of turn): a participant who is not active, has not acted and holds a card can Parry or Evade. This spends their action: they are marked "acted" and their turn is skipped. Turn order is otherwise unchanged. Available to the GM and the token's controller (anyone when "Players can Alter Any Action" is on). With Ferocity, each row is a separate action. Not available on the active participant.
 
 ### 1.3 Swap Restrictions
 - Can only swap with participants who have NOT acted yet (higher initiative numbers)
@@ -131,7 +131,7 @@ Players can:
 
 #### Participant List
 Each row displays:
-- Token name (as shown on the map) by default; with "Take player name" ticked before combat (GM, remembered per browser), the name of the player who controls the token, falling back to the token name for GM tokens or players not in the room. Also applies to Add Participants. GM rename overrides either.
+- Token name (as shown on the map) by default; with "Use Player Name" ticked before combat (GM, remembered per browser), the name of the player who controls the token, falling back to the token name for GM tokens or players not in the room. Also applies to Add Participants. GM rename overrides either.
 - Initiative card icon with number (or placeholder if not yet drawn)
 - Status badge:
   - "Draw" button (during draw phase, for controlling player)
@@ -315,7 +315,7 @@ The following features are NOT included in the initial implementation but may be
 ### 9.4a Parry/Evade
 - [ ] Parry/Evade shows only during an active round, on rows that are not active, have not acted and hold a card
 - [ ] Clicking it marks the participant "acted" and their turn is skipped
-- [ ] Only the GM and the token's controller can use it, unless "Any player can edit" is on
+- [ ] Only the GM and the token's controller can use it, unless "Players can Alter Any Action" is on
 
 ### 9.5 Round Management
 - [ ] Round completes when all participants have acted
@@ -370,4 +370,4 @@ The following features are NOT included in the initial implementation but may be
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | 2024-XX-XX | - | Initial requirements |
-| 2.3 | 2026-10-16 | - | Parry/Evade replaces the GM row Wait toggle; token names by default with "Take player name" option |
+| 2.3 | 2026-10-16 | - | Parry/Evade replaces the GM row Wait toggle; token names by default with "Use Player Name" option |

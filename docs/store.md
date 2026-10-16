@@ -51,7 +51,7 @@ The GM sees full controls — add/remove participants, start rounds, and manage 
 
 ### Abilities and GM Tools
 
-Toggle **Lightning Fast** (draw two cards, keep one), **Surprise** (GM, round 1: pick any free card first) and **Keep** (Veteran: keep your card into the next round) per participant; the GM can also swap cards and set or clear any card. Out of turn, a participant can **Parry/Evade**, which spends their action so their turn is skipped. Rows show token names, or the controlling player's name when the GM ticks **Take player name** before combat. The extension does not check that a character has an ability.
+Toggle **Lightning Fast** (draw two cards, keep one), **Surprise** (GM, round 1: pick any free card first) and **Keep Card** (Veteran: keep your card into the next round) per participant; the GM can also swap cards and set or clear any card. Out of turn, a participant can **Parry/Evade**, which spends their action so their turn is skipped. Rows show token names, or the controlling player's name when the GM ticks **Use Player Name** before combat. The extension does not check that a character has an ability.
 
 ### Real-Time Sync
 
