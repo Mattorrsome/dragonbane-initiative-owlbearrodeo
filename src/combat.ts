@@ -141,6 +141,7 @@ export interface TokenInfo {
 export function buildParticipants(
   items: TokenInfo[],
   players: { id: string; name: string }[],
+  takePlayerName = false,
   newId: () => string = () => crypto.randomUUID()
 ): Participant[] {
   return items.map((item) => {
@@ -148,7 +149,7 @@ export function buildParticipants(
     return withDefaults({
       id: newId(),
       tokenId: item.id,
-      name: owner?.name || item.name || "Unknown",
+      name: (takePlayerName && owner?.name) || item.name || "Unknown",
       controlledBy: owner ? owner.id : "GM",
     });
   });
@@ -522,20 +523,22 @@ export function gmSwapCards(
   );
 }
 
-export function gmToggleWait(s: CombatState, a: { id: string }, ctx: Ctx): Result {
-  const denied = gmOnly(s, ctx, "toggle Wait");
-  if (denied) return denied;
-  if (s.phase !== "ACTIVE") return reject(s, "No round in progress");
-  const p = findP(s, a.id);
-  if (!p) return reject(s, "Participant not found");
-  if (p.status === "ACTED") return reject(s, "Already acted");
-  const waiting = p.status !== "WAITED";
-  return ok(
-    settle(
-      mapP(s, a.id, (x) => ({ ...x, status: waiting ? ("WAITED" as const) : ("PENDING" as const) })),
-      waiting ? a.id : undefined
-    )
-  );
+/** Why this participant can't Parry/Evade right now, or null if they can. */
+export function parryBlock(s: CombatState, p: Participant | undefined, ctx: Ctx): string | null {
+  if (!p) return "Participant not found";
+  if (s.phase !== "ACTIVE") return "No round in progress";
+  if (!canEdit(s, p, ctx)) return "You don't control that participant";
+  if (p.status === "ACTIVE") return "It's their turn: Act or Wait instead";
+  if (p.status === "ACTED") return "Already acted";
+  if (p.initiativeCard === null) return "Has no card this round";
+  return null;
+}
+
+/** Parry/Evade spends the participant's action for the round; their turn is skipped. */
+export function parryEvade(s: CombatState, a: { id: string }, ctx: Ctx): Result {
+  const blocked = parryBlock(s, findP(s, a.id), ctx);
+  if (blocked) return reject(s, blocked);
+  return ok(settle(mapP(s, a.id, (p) => ({ ...p, status: "ACTED" as const }))));
 }
 
 export function gmSetCard(

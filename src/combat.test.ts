@@ -98,17 +98,31 @@ describe("setup reducers", () => {
     return () => "id" + ++n;
   };
 
-  it("buildParticipants resolves player ownership and names", () => {
+  it("buildParticipants resolves player ownership and uses token names by default", () => {
     const ps = c.buildParticipants(
       [
         { id: "t1", name: "Token", createdUserId: "p1" },
         { id: "t2", name: "", createdUserId: "unknown" },
       ],
       [{ id: "p1", name: "Alice" }],
+      false,
       counter()
     );
-    expect(ps[0]).toMatchObject({ id: "id1", tokenId: "t1", name: "Alice", controlledBy: "p1" });
+    expect(ps[0]).toMatchObject({ id: "id1", tokenId: "t1", name: "Token", controlledBy: "p1" });
     expect(ps[1]).toMatchObject({ name: "Unknown", controlledBy: "GM", lightningFast: false });
+  });
+
+  it("buildParticipants takes the controlling player's name when asked", () => {
+    const ps = c.buildParticipants(
+      [
+        { id: "t1", name: "Token", createdUserId: "p1" },
+        { id: "t2", name: "Goblin", createdUserId: "gm" },
+      ],
+      [{ id: "p1", name: "Alice" }],
+      true,
+      counter()
+    );
+    expect(ps.map((p) => p.name)).toEqual(["Alice", "Goblin"]);
   });
 
   it("startCombat is GM only and sets deck size", () => {
@@ -522,30 +536,41 @@ describe("GM overrides", () => {
     expect(r.participants.map((p) => p.initiativeCard)).toEqual([null, 4]);
   });
 
-  it("gmToggleWait marks the active participant WAITED without moving cards, then clears it", () => {
+  it("parryEvade marks a waiting participant ACTED and leaves the turn alone", () => {
     let s = mkRound([1, 2, 3]);
-    s = c.gmToggleWait(s, { id: "a" }, GM).state;
-    expect(s.participants.find((p) => p.id === "a")).toMatchObject({ status: "WAITED", initiativeCard: 1 });
-    expect(activeId(s)).toBe("b");
-    s = c.gmToggleWait(s, { id: "a" }, GM).state;
-    expect(s.participants.find((p) => p.id === "a")?.status).toBe("PENDING");
-    expect(activeId(s)).toBe("b");
-  });
-
-  it("a waited participant acts once they are the lowest remaining", () => {
-    let s = c.gmToggleWait(mkRound([1, 2, 3]), { id: "a" }, GM).state;
-    s = c.act(s, GM).state; // b acts
+    s = c.parryEvade(s, { id: "c" }, GM).state;
+    expect(s.participants.find((p) => p.id === "c")).toMatchObject({ status: "ACTED", initiativeCard: 3 });
     expect(activeId(s)).toBe("a");
-    expect(c.gmToggleWait(s, { id: "zzz" }, GM).state).toBe(s);
+    s = c.act(s, GM).state; // a acts
+    s = c.act(s, GM).state; // b acts, c is skipped
+    expect(s.phase).toBe("ROUND_COMPLETE");
   });
 
-  it("gmToggleWait rejects ACTED participants, non-GM and other phases", () => {
+  it("parryEvade works on a participant who has Waited", () => {
+    let s = c.swap(mkRound([1, 2, 3]), { targetId: "b" }, GM).state; // a waits with card 2
+    s = c.parryEvade(s, { id: "a" }, GM).state;
+    expect(s.participants.find((p) => p.id === "a")?.status).toBe("ACTED");
+    expect(activeId(s)).toBe("b");
+  });
+
+  it("parryEvade rejects the active participant, ACTED, card-less and other phases", () => {
     let s = mkRound([1, 2]);
+    expect(c.parryEvade(s, { id: "a" }, GM).error).toBeDefined();
     s = c.act(s, GM).state;
-    expect(c.gmToggleWait(s, { id: "a" }, GM).error).toBeDefined();
-    expect(c.gmToggleWait(s, { id: "b" }, P1).error).toBeDefined();
-    const drawing = mkS([mkP("a")]);
-    expect(c.gmToggleWait(drawing, { id: "a" }, GM).state).toBe(drawing);
+    expect(c.parryEvade(s, { id: "a" }, GM).error).toBeDefined();
+    expect(c.parryEvade(s, { id: "zzz" }, GM).state).toBe(s);
+    const noCard = c.gmSetCard(mkRound([1, 2, 3]), { id: "c", card: null }, GM).state;
+    expect(c.parryEvade(noCard, { id: "c" }, GM).error).toBeDefined();
+    const drawing = mkS([mkP("a", { initiativeCard: 1 })]);
+    expect(c.parryEvade(drawing, { id: "a" }, GM).state).toBe(drawing);
+  });
+
+  it("parryEvade is allowed for the controller, or anyone when any player can edit", () => {
+    const s = mkRound([1, 2, 3], [{}, { controlledBy: "p1" }, {}]);
+    expect(c.parryEvade(s, { id: "b" }, P1).state.participants[1].status).toBe("ACTED");
+    expect(c.parryEvade(s, { id: "c" }, P1).error).toBeDefined();
+    const open = { ...s, anyPlayerCanEdit: true };
+    expect(c.parryEvade(open, { id: "c" }, P1).state.participants[2].status).toBe("ACTED");
   });
 
   it("gmSetCard assigns a free card, returning the old one", () => {

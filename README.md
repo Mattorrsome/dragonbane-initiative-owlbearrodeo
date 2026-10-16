@@ -29,7 +29,9 @@ The Dragonbane initiative system uses a virtual deck of cards numbered 1 up to N
 - **Surprise** (GM, round 1 only): the participant picks any free card before anyone else draws.
 - **Keep** (Veteran, keep your card into the next round): toggle at any time before "Draw New Round"; the participant keeps their final card.
 - The extension does not check that a character actually has an ability.
-- The GM can swap two participants' cards (⇄), toggle Wait without exchanging cards, and set or clear any card.
+- **Parry/Evade**: during a round, a participant who isn't active and hasn't acted can Parry or Evade. This spends their action, so their turn is skipped. Usable by the GM and the token's player (anyone when "Any player can edit" is on).
+- **Take player name**: rows show the token's name by default. Tick "Take player name" before starting combat to show the controlling player's name instead (falls back to the token's name for GM tokens or absent players). Remembered in the GM's browser.
+- The GM can swap two participants' cards (⇄) and set or clear any card.
 - The deck holds `min(20, max(10, participants + Lightning Fast participants))` cards; at 20 participants, adding more is disabled.
 
 ## Usage Guide

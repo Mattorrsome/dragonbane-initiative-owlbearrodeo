@@ -8,6 +8,7 @@ type Role = "GM" | "PLAYER";
 type Theme = "DARK" | "LIGHT";
 
 const ANY_EDIT_KEY = "com.dragonbane-initiative/any-player-can-edit";
+const PLAYER_NAME_KEY = "com.dragonbane-initiative/take-player-name";
 
 const FEROCITY_COLORS = ["#ff7043", "#42a5f5", "#66bb6a", "#ffca28", "#ec407a", "#26c6da"];
 
@@ -26,6 +27,8 @@ function App() {
   const [editingNameValue, setEditingNameValue] = useState("");
   // GM preference, remembered per browser and copied into combat state at start.
   const [anyPlayerCanEdit, setAnyPlayerCanEdit] = useState(() => localStorage.getItem(ANY_EDIT_KEY) === "true");
+  // GM preference, remembered per browser; names rows at start and on Add Participants.
+  const [takePlayerName, setTakePlayerName] = useState(() => localStorage.getItem(PLAYER_NAME_KEY) === "true");
 
   const combatRef = useRef(combatState);
   useEffect(() => {
@@ -195,7 +198,7 @@ function App() {
       return;
     }
     const items = await OBR.scene.items.getItems(selection);
-    const participants = combat.buildParticipants(items, partyPlayers);
+    const participants = combat.buildParticipants(items, partyPlayers, takePlayerName);
     if (await run((s, c) => combat.startCombat(s, { participants, anyPlayerCanEdit }, c)))
       await OBR.player.deselect();
   };
@@ -239,7 +242,7 @@ function App() {
       return;
     }
     const items = await OBR.scene.items.getItems(selection);
-    const participants = combat.buildParticipants(items, partyPlayers);
+    const participants = combat.buildParticipants(items, partyPlayers, takePlayerName);
     await run((s, c) => combat.addParticipants(s, { participants }, c));
   };
 
@@ -253,7 +256,7 @@ function App() {
     run((s, c) => combat.chooseOne(s, { id, card }, c));
   const pickSurprise = (id: string, card: number) =>
     run((s, c) => combat.pickSurpriseCard(s, { id, card }, c));
-  const gmWait = (id: string) => run((s, c) => combat.gmToggleWait(s, { id }, c));
+  const parryEvade = (id: string) => run((s, c) => combat.parryEvade(s, { id }, c));
   const gmSetCard = (id: string, card: number | null) =>
     run((s, c) => combat.gmSetCard(s, { id, card }, c));
   const gmSwapClick = async (id: string) => {
@@ -353,7 +356,7 @@ function App() {
           {isGM && (
             <label
               className="toggle"
-              style={{ paddingBottom: "2em" }}
+              style={{ paddingBottom: "0.5em" }}
               title="When checked, every player can toggle Lightning Fast, Surprise and Keep (Veteran), draw cards, pick Surprise cards and choose Lightning Fast cards for any participant, even tokens not assigned to them. Otherwise only the GM and a token's owner can. Remembered on this browser for future combats."
             >
               <input
@@ -365,6 +368,23 @@ function App() {
                 }}
               />
               Any player can edit
+            </label>
+          )}
+          {isGM && (
+            <label
+              className="toggle"
+              style={{ paddingBottom: "2em" }}
+              title="When checked, rows show the name of the player who controls the token instead of the token's name. Falls back to the token's name for GM tokens or when that player isn't in the room. Remembered on this browser for future combats."
+            >
+              <input
+                type="checkbox"
+                checked={takePlayerName}
+                onChange={(e) => {
+                  setTakePlayerName(e.target.checked);
+                  localStorage.setItem(PLAYER_NAME_KEY, String(e.target.checked));
+                }}
+              />
+              Take player name
             </label>
           )}
           {isGM && (
@@ -541,13 +561,13 @@ function App() {
                       </select>
                     )}
 
-                    {isGM && combatState.phase === "ACTIVE" && p.status !== "ACTED" && (
+                    {!combat.parryBlock(combatState, p, ctx) && (
                       <button
                         className="btn-secondary btn-small"
-                        onClick={() => gmWait(p.id)}
-                        title="Toggle Wait without exchanging cards"
+                        onClick={() => parryEvade(p.id)}
+                        title="Parry or Evade: spends this participant's action, so their turn is skipped this round"
                       >
-                        {p.status === "WAITED" ? "Unwait" : "Wait"}
+                        Parry/Evade
                       </button>
                     )}
                     {isGM && drawing && allDrawn && (
