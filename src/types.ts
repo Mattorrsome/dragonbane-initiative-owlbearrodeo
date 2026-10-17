@@ -39,3 +39,7 @@ export const INITIAL_COMBAT_STATE: CombatState = {
 };
 
 export const METADATA_KEY = "com.dragonbane-initiative/combat-state";
+
+/** Local broadcast: the popover hands toast ids to the background page, which closes them. */
+export const TOAST_CHANNEL = "com.dragonbane-initiative/toast";
+export const TOAST_MS = 15000;

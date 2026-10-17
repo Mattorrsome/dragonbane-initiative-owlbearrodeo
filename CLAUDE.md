@@ -23,7 +23,7 @@ An Owlbear Rodeo extension that implements the Dragonbane RPG initiative system 
 The build produces two HTML entry points (configured in `vite.config.ts`):
 - **`index.html`** — Public landing page (static, no React)
 - **`extension.html`** — The actual Owlbear Rodeo extension UI (React app)
-- **`background.html`** — Manifest `background_url`; runs on every client and opens the popover when combat starts (`src/background.ts`)
+- **`background.html`** — Manifest `background_url`; runs on every client, opens the popover when combat starts, and draws a local ring around the active participant's token (skipped for players when the token is hidden) (`src/background.ts`)
 
 ### Single-component React app
 

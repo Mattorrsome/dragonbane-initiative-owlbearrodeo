@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import OBR, { Player } from "@owlbear-rodeo/sdk";
-import { CombatState, Participant, INITIAL_COMBAT_STATE, METADATA_KEY } from "./types";
+import { CombatState, Participant, INITIAL_COMBAT_STATE, METADATA_KEY, TOAST_CHANNEL } from "./types";
 import * as combat from "./combat";
 import type { Ctx, Result } from "./combat";
 
@@ -9,6 +9,14 @@ type Theme = "DARK" | "LIGHT";
 
 const ANY_EDIT_KEY = "com.dragonbane-initiative/any-player-can-edit";
 const PLAYER_NAME_KEY = "com.dragonbane-initiative/take-player-name";
+
+type Variant = Parameters<typeof OBR.notification.show>[1];
+
+// Background page closes it after TOAST_MS, so it goes away even if the popover is closed.
+async function notify(message: string, variant?: Variant) {
+  const id = await OBR.notification.show(message, variant);
+  await OBR.broadcast.sendMessage(TOAST_CHANNEL, id, { destination: "LOCAL" });
+}
 
 const FEROCITY_COLORS = ["#ff7043", "#42a5f5", "#66bb6a", "#ffca28", "#ec407a", "#26c6da"];
 
@@ -46,15 +54,15 @@ function App() {
         const current = combat.normalizeState(metadata[METADATA_KEY]);
         const { state, error, notice } = reducer(current);
         if (error) {
-          await OBR.notification.show(error, "WARNING");
+          await notify(error, "WARNING");
           return false;
         }
         if (state !== current) await OBR.room.setMetadata({ [METADATA_KEY]: state });
-        if (notice) await OBR.notification.show(notice);
+        if (notice) await notify(notice);
         return true;
       } catch (e) {
         console.error(e);
-        await OBR.notification.show("Couldn't update combat, try again", "ERROR").catch(() => {});
+        await notify("Couldn't update combat, try again", "ERROR").catch(() => {});
         return false;
       }
     },
@@ -98,7 +106,7 @@ function App() {
     const unsubMetadata = OBR.room.onMetadataChange((metadata) => {
       const next = combat.normalizeState(metadata[METADATA_KEY]);
       if (role !== "GM" && next.isActive !== combatRef.current.isActive) {
-        OBR.notification.show(next.isActive ? "Combat started" : "Combat ended").catch(console.error);
+        notify(next.isActive ? "Combat started" : "Combat ended").catch(console.error);
       }
       setCombatState(next);
     });
@@ -194,7 +202,7 @@ function App() {
   const startCombat = async () => {
     const selection = await OBR.player.getSelection();
     if (!selection || selection.length === 0) {
-      await OBR.notification.show("Select tokens to add to combat", "WARNING");
+      await notify("Select tokens to add to combat", "WARNING");
       return;
     }
     const items = await OBR.scene.items.getItems(selection);
@@ -238,7 +246,7 @@ function App() {
   const addParticipants = async () => {
     const selection = await OBR.player.getSelection();
     if (!selection || selection.length === 0) {
-      await OBR.notification.show("Select tokens to add", "WARNING");
+      await notify("Select tokens to add", "WARNING");
       return;
     }
     const items = await OBR.scene.items.getItems(selection);
@@ -301,9 +309,9 @@ function App() {
     return "";
   };
 
-  // Determine display order
+  // Join order while cards are still being drawn; card order once everyone holds one.
   const displayParticipants =
-    combatState.phase === "DRAWING"
+    combatState.phase === "DRAWING" && !allDrawn
       ? combatState.participants
       : [...sorted, ...combatState.participants.filter((p) => p.initiativeCard === null)];
 
@@ -475,7 +483,7 @@ function App() {
                         {fer && ` - Action ${fer.n}`}
                       </div>
                     )}
-                    <div className="participant-status">{getParticipantStatusText(p)}</div>
+                    <div className={`participant-status status-${p.status.toLowerCase()}`}>{getParticipantStatusText(p)}</div>
                     <div className="toggle-row">
                       {drawing && unheld && editable && (
                         <label className="toggle">

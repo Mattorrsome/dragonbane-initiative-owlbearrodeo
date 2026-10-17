@@ -203,6 +203,25 @@ button:disabled {
   opacity: 0.7;
 }
 
+.participant-status.status-active,
+.participant-status.status-acted,
+.participant-status.status-waited {
+  opacity: 1;
+  font-weight: 600;
+}
+
+.participant-status.status-active {
+  color: #bb86fc;
+}
+
+.participant-status.status-acted {
+  color: #b8860b; /* dark gold */
+}
+
+.participant-status.status-waited {
+  color: #03dac6;
+}
+
 /* Actions */
 .participant-actions {
   display: flex;
