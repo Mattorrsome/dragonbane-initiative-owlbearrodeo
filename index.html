@@ -17,7 +17,7 @@
       <div class="nav-content">
         <a href="/" class="nav-brand">Card Initiative for Dragonbane</a>
         <div class="nav-links">
-          <a href="https://github.com/gabriel-aleixo/dragonbane-initiative-owlbearrodeo" target="_blank" rel="noopener">
+          <a href="https://github.com/Mattorrsome/dragonbane-initiative-owlbearrodeo" target="_blank" rel="noopener">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
             </svg>
@@ -75,8 +75,8 @@
             <ul>
               <li><strong>Lightning Fast:</strong> tick it before drawing. The participant draws two cards and keeps the one they want; the other goes back in the deck</li>
               <li><strong>Surprise</strong> (round 1): the participant picks any free card before anyone else draws</li>
-              <li><strong>Keep Card</strong> (Veteran): tick it any time after drawing to keep your final card into the next round</li>
-              <li><strong>Parry/Evade:</strong> reacting out of turn spends your action. Click Parry/Evade on your row and your turn is skipped this round</li>
+              <li><strong>Keep Card</strong> (Veteran): tick it during the round, or once it's complete, to keep your final card into the next round</li>
+              <li><strong>Parry/Evade:</strong> reacting out of turn spends your action. Click Parry/Evade on your row and your turn is skipped this round. Works after Waiting too, and each Ferocity entry is a separate action</li>
               <li>The extension doesn't check that a character actually has the ability</li>
             </ul>
 
@@ -86,16 +86,19 @@
           <div class="segment-col">
             <h3>GM Tools</h3>
             <ul>
-              <li><strong>⇄ Swap:</strong> exchange any two participants' cards</li>
-              <li><strong>Set…:</strong> set or clear any participant's card</li>
+              <li><strong>⇄ Swap:</strong> exchange any two participants' cards (drawing phase, once everyone has a card)</li>
+              <li><strong>Set…:</strong> set or clear any participant's card (drawing phase, once everyone has a card)</li>
               <li><strong>Players can Alter Any Action:</strong> a checkbox shown before combat starts (see below)</li>
-              <li><strong>Use player name:</strong> a checkbox shown before combat starts. Rows show the token's name by default; tick it to show the controlling player's name instead</li>
+              <li><strong>Use Player Name:</strong> a checkbox shown before combat starts. Rows show the token's name by default; tick it to show the controlling player's name instead (the token's name is kept for GM-created tokens or players not in the room). Remembered in the GM's browser</li>
             </ul>
 
             <h3>Smoother Play</h3>
             <ul>
               <li>The initiative window opens for every player when combat starts</li>
-              <li>The active participant's token gets a gold ring on the map</li>
+              <li>The active participant's token gets a gold ring on the map (players never see it on hidden tokens)</li>
+              <li>Once everyone has a card, the list sorts lowest card first, before the round starts</li>
+              <li>Status labels are coloured: <strong>Active</strong> purple, <strong>Acted</strong> dark gold, <strong>Waited</strong> teal</li>
+              <li>Notifications close by themselves after 15 seconds</li>
               <li>The Start Combat button shows how many tokens are selected, and clears the map selection once combat starts</li>
               <li>A "drew #N" line shows the latest draw</li>
               <li>Deleting a token from the map removes it from combat; switching scenes never does</li>
@@ -136,8 +139,8 @@
             <div class="dragonbox">
               <h4>Waiting Rules</h4>
               <ul>
-                <li>You can only swap initiative cards with participants who haven't acted yet</li>
-                <li>This means you can only swap initiative cards with participants who have a higher initiative number than you</li>
+                <li>You can only swap cards with participants who have a higher card than you and haven't acted or waited yet</li>
+                <li>The participant you swap with takes your lower card and acts now</li>
                 <li>After waiting, you're marked as "Waited" and can no longer be a swap target</li>
                 <li>NPCs can wait too; the GM controls them</li>
                 <li>Monsters can also wait in the extension. This is technically against the Dragonbane rules, but was added for ease of use</li>
@@ -181,16 +184,16 @@
             <h3>Drawing Phase</h3>
             <ul>
               <li>Each player draws their own card by clicking <strong>"Draw"</strong> next to their character</li>
-              <li>Tick <strong>Lightning Fast</strong> or <strong>Surprise</strong> before anyone draws</li>
+              <li>Tick <strong>Lightning Fast</strong> before that participant draws, and <strong>Surprise</strong> (round 1) before anyone draws</li>
               <li>Use <strong>"Draw All Cards"</strong> to auto-assign cards to participants who haven't drawn</li>
-              <li>Once everyone has a card, use <strong>⇄</strong> and <strong>Set…</strong> to fix cards if needed</li>
+              <li>Once everyone has a card, the list sorts by card and you can use <strong>⇄</strong> and <strong>Set…</strong> to fix cards if needed</li>
               <li>Click <strong>"Start Round"</strong> once all cards are drawn</li>
             </ul>
           </div>
           <div class="segment-col">
             <h3>Managing Combat</h3>
             <ul>
-              <li><strong>Add Participants:</strong> Select new tokens and click "Add Participants" (only during drawing phase)</li>
+              <li><strong>Add Participants:</strong> Select new tokens and click "Add Participants" (only during drawing phase, up to 20 participants)</li>
               <li><strong>Edit Names:</strong> Click the name of a participant to edit it (only during drawing phase)</li>
               <li><strong>Remove Participants:</strong> Click the ✕ button next to any participant (anytime). This removes all of a monster's Ferocity entries too</li>
               <li><strong>Parry/Evade:</strong> Click it on anyone who isn't active and hasn't acted. Their action is spent and their turn is skipped this round</li>
@@ -241,7 +244,11 @@
             <p>When your character is highlighted as active:</p>
             <ul>
               <li>Click <strong>"Act"</strong> to complete your turn</li>
-              <li>Click <strong>"Wait"</strong> to exchange initiative cards with another participant (see waiting rules above)</li>
+              <li>Click <strong>"Wait"</strong> to exchange initiative cards with another participant (see waiting rules above). It only appears when someone can be swapped with</li>
+            </ul>
+            <p>At any time during the round:</p>
+            <ul>
+              <li>Click <strong>"Parry/Evade"</strong> on your row to spend your action out of turn</li>
               <li>Tick <strong>Keep Card</strong> (Veteran) to keep your card for the next round</li>
             </ul>
           </div>
@@ -270,16 +277,20 @@
                   <td>Card not yet drawn</td>
                 </tr>
                 <tr>
-                  <td>Highlighted row</td>
+                  <td>Purple highlighted row, "Active" label</td>
                   <td>Currently active turn</td>
                 </tr>
                 <tr>
-                  <td>Dimmed row</td>
-                  <td>Already acted this round</td>
+                  <td>Dimmed row, gold "Acted" label</td>
+                  <td>Already acted this round (including Parry/Evade)</td>
                 </tr>
                 <tr>
-                  <td>Teal left border</td>
-                  <td>"Waited" status (waited, cannot be swap target)</td>
+                  <td>Teal left border, teal "Waited" label</td>
+                  <td>Waited, cannot be a swap target</td>
+                </tr>
+                <tr>
+                  <td>Gold ring on the map</td>
+                  <td>Token whose turn it is</td>
                 </tr>
                 <tr>
                   <td>"3 or 7" card</td>
