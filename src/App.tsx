@@ -624,7 +624,7 @@ function App() {
 
           {/* Active Turn Actions */}
           {combatState.phase === "ACTIVE" && currentParticipant && canControl(currentParticipant) && (
-            <div className="action-buttons sticky-actions">
+            <div className={`action-buttons sticky-actions ${swapping ? 'stretchHeight' : ''}`}>
               {!swapping ? (
                 <>
                   <button className="btn-primary btn-full" onClick={act}>

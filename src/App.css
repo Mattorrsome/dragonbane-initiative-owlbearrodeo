@@ -241,6 +241,7 @@ button:disabled {
   margin-top: 0;
   padding: 12px 0;
   flex-shrink: 0;
+  
 }
 
 .app.dark .action-buttons.sticky-actions {
@@ -270,6 +271,7 @@ button:disabled {
   padding: 8px;
   background: rgba(128, 128, 128, 0.1);
   border-radius: 4px;
+  width: stretch;
 }
 
 .swap-targets h4 {
@@ -352,6 +354,14 @@ button:disabled {
   font-size: 12px;
   padding: 4px 8px;
   opacity: 0.8;
+}
+
+.stretchHeight {
+  height: stretch;
+}
+
+.stretchWidth {
+  width: Stretch;
 }
 
 /* Narrow popover: card + name on the first line, action buttons wrap onto their own line */
