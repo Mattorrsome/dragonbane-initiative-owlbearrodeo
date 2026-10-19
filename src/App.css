@@ -362,10 +362,6 @@ button:disabled {
   opacity: 0.8;
 }
 
-.stretchHeight {
-  height: stretch;
-}
-
 .stretchWidth {
   width: Stretch;
 }
