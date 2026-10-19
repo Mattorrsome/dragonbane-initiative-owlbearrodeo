@@ -31,12 +31,12 @@ The Dragonbane initiative system uses a virtual deck of cards numbered 1 up to N
 - This spends their action: they're marked "Acted" and their turn is skipped. Nobody else's order changes
 - Participants who have Waited can still Parry/Evade
 - Each Ferocity entry is a separate action
-- Usable by the GM and the token's player (anyone when "Players can Alter Any Action" is on)
+- Usable by the GM and the token's player (anyone when "Players can Alter Any Token" is on)
 
 ### Abilities
 
 - **Lightning Fast**: tick it on a participant before they draw. They draw two cards and keep one; the other goes back in the deck.
-- **Surprise** (round 1 only): the GM ticks it before anyone draws (players can too with "Players can Alter Any Action"). The participant picks any free card first; everyone else draws once all Surprise picks are made.
+- **Surprise** (round 1 only): the GM ticks it before anyone draws (players can too with "Players can Alter Any Token"). The participant picks any free card first; everyone else draws once all Surprise picks are made.
 - **Keep Card** (Veteran): tick it during the round, or once it's complete, before "Draw New Round". The participant keeps their final card into the next round.
 - The extension does not check that a character actually has an ability.
 
@@ -44,7 +44,7 @@ The Dragonbane initiative system uses a virtual deck of cards numbered 1 up to N
 
 The GM sees two checkboxes before starting combat. Both are remembered in the GM's browser for future combats.
 
-- **Players can Alter Any Action**: every player can toggle Lightning Fast, Surprise and Keep Card, draw cards, pick Surprise cards, choose Lightning Fast cards and use Parry/Evade for any participant. Act and Wait still belong to the token's owner or the GM. Off: only the GM and a token's owner can.
+- **Players can Alter Any Token**: every player can toggle Lightning Fast, Surprise and Keep Card, draw cards, pick Surprise cards, choose Lightning Fast cards and use Parry/Evade for any participant. Act and Wait still belong to the token's owner or the GM. Off: only the GM and a token's owner can.
 - **Use Player Name**: rows show the token's name by default. Tick this to show the name of the player who controls the token instead. Falls back to the token's name for GM-created tokens or when that player isn't in the room. Also applies to Add Participants.
 
 ### Table Helpers
@@ -64,7 +64,7 @@ The GM sees two checkboxes before starting combat. Both are remembered in the GM
 #### Starting Combat
 1. Open the extension (toolbar title "Dragonbane Initiative")
 2. Select the tokens on the map that will take part
-3. Optionally tick **"Players can Alter Any Action"** and **"Use Player Name"**
+3. Optionally tick **"Players can Alter Any Token"** and **"Use Player Name"**
 4. Click **"Start Combat with N Combatants"** (the map selection is cleared afterwards)
 
 #### Drawing Phase
@@ -235,7 +235,7 @@ Users install by adding your hosted manifest URL. The host must send `Access-Con
 
 ### Data Storage
 
-Combat state is stored in Room Metadata under the key `com.dragonbane-initiative/combat-state`. This persists across page refreshes and scene changes. The GM's "Players can Alter Any Action" and "Use Player Name" choices are kept in that browser's `localStorage`.
+Combat state is stored in Room Metadata under the key `com.dragonbane-initiative/combat-state`. This persists across page refreshes and scene changes. The GM's "Players can Alter Any Token" and "Use Player Name" choices are kept in that browser's `localStorage`.
 
 ## Disclaimer
 

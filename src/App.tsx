@@ -193,7 +193,7 @@ function App() {
     const from = scrollFrom.current;
     if (from === null || swapping || (from !== "" && from === turnKey)) return;
     scrollFrom.current = null;
-    document.querySelector(".participant-row.active")?.scrollIntoView({ block: "center" });
+    document.querySelector(".participant-row.active")?.scrollIntoView({ block: "start" });
   }, [turnKey, swapping]);
   const tableKey = `${combatState.phase}|${combatState.roundNumber}|${combatState.participants.length}`;
   const gmSwapFirst =
@@ -391,7 +391,7 @@ function App() {
                     localStorage.setItem(ANY_EDIT_KEY, String(e.target.checked));
                   }}
                 />
-                Players can Alter Any Action
+                Players can Alter Any Token
               </label>
               <label
                 className="toggle"

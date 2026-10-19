@@ -25,7 +25,7 @@ On their turn, a participant can choose one of two actions:
    - After swapping, the player who initiated the swap is marked as "waited" and can NO LONGER be a swap target for the rest of the round
    - The recipient of the swap can also choose to swap (but not back with the person who just swapped with them, since they are marked as "waited")
 
-3. **Parry/Evade** (out of turn): a participant who is not active, has not acted and holds a card can Parry or Evade. This spends their action: they are marked "acted" and their turn is skipped. Turn order is otherwise unchanged. Available to the GM and the token's controller (anyone when "Players can Alter Any Action" is on). With Ferocity, each row is a separate action. Not available on the active participant.
+3. **Parry/Evade** (out of turn): a participant who is not active, has not acted and holds a card can Parry or Evade. This spends their action: they are marked "acted" and their turn is skipped. Turn order is otherwise unchanged. Available to the GM and the token's controller (anyone when "Players can Alter Any Token" is on). With Ferocity, each row is a separate action. Not available on the active participant.
 
 ### 1.3 Swap Restrictions
 - Can only swap with participants who have NOT acted yet (higher initiative numbers)
@@ -315,7 +315,7 @@ The following features are NOT included in the initial implementation but may be
 ### 9.4a Parry/Evade
 - [ ] Parry/Evade shows only during an active round, on rows that are not active, have not acted and hold a card
 - [ ] Clicking it marks the participant "acted" and their turn is skipped
-- [ ] Only the GM and the token's controller can use it, unless "Players can Alter Any Action" is on
+- [ ] Only the GM and the token's controller can use it, unless "Players can Alter Any Token" is on
 
 ### 9.5 Round Management
 - [ ] Round completes when all participants have acted

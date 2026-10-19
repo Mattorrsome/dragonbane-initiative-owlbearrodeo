@@ -430,7 +430,7 @@ describe("Surprise", () => {
   });
 });
 
-describe("Players can Alter Any Action", () => {
+describe("Players can Alter Any Token", () => {
   it("lets players toggle Lightning Fast, Surprise and Keep on tokens they don't control", () => {
     const off = mkS([mkP("b")]);
     const on = mkS([mkP("b")], { anyPlayerCanEdit: true });
@@ -565,7 +565,7 @@ describe("GM overrides", () => {
     expect(c.parryEvade(drawing, { id: "a" }, GM).state).toBe(drawing);
   });
 
-  it("parryEvade is allowed for the controller, or anyone when Players can Alter Any Action", () => {
+  it("parryEvade is allowed for the controller, or anyone when Players can Alter Any Token", () => {
     const s = mkRound([1, 2, 3], [{}, { controlledBy: "p1" }, {}]);
     expect(c.parryEvade(s, { id: "b" }, P1).state.participants[1].status).toBe("ACTED");
     expect(c.parryEvade(s, { id: "c" }, P1).error).toBeDefined();
