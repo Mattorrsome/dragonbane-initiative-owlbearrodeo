@@ -82,7 +82,7 @@ The GM sees two checkboxes before starting combat. Both are remembered in the GM
 - **End Combat**: click "End Combat" to clear all combat state
 
 #### Round Completion
-When all participants have acted, click **"Draw New Round"** to start fresh draws. Anyone with **Keep Card** ticked keeps their card.
+When all participants have acted, click **"Draw New Round"**: cards are dealt to everyone automatically (Lightning Fast still picks one of two), then click **"Start Round"**. Anyone with **Keep Card** ticked keeps their card.
 
 #### Ferocity (Multiple Turns)
 Some monsters have the Ferocity ability, allowing them to take multiple turns per round. To handle this:

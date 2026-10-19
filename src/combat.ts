@@ -486,7 +486,7 @@ export function newRound(s: CombatState, ctx: Ctx): Result {
     pendingCards: null,
   }));
   const drawnCards = participants.flatMap((p) => (p.initiativeCard === null ? [] : [p.initiativeCard]));
-  return ok({
+  const next: CombatState = {
     ...s,
     phase: "DRAWING",
     roundNumber: s.roundNumber + 1,
@@ -494,7 +494,10 @@ export function newRound(s: CombatState, ctx: Ctx): Result {
     drawnCards,
     deckSize: Math.max(deckSizeOf(participants), ...drawnCards),
     lastDraw: null,
-  });
+  };
+  // Round 2+ deals everyone straight away; drawAll only fails when everyone kept a card.
+  const dealt = drawAll(next, ctx);
+  return ok(dealt.error ? next : dealt.state);
 }
 export function gmSwapCards(
   s: CombatState,

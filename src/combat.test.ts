@@ -477,10 +477,30 @@ describe("Keep card and newRound", () => {
     const r = c.newRound(s, GM).state;
     expect(r.phase).toBe("DRAWING");
     expect(r.roundNumber).toBe(2);
-    expect(r.drawnCards).toEqual([4]);
     expect(r.participants[0]).toMatchObject({ initiativeCard: 4, status: "PENDING", retainNext: false });
-    expect(r.participants[1]).toMatchObject({ initiativeCard: null, surprise: false });
+    expect(r.participants[1]).toMatchObject({ surprise: false });
     expect(r.lastDraw).toBeNull();
+  });
+
+  it("newRound deals everyone, Lightning Fast gets a pair to choose from", () => {
+    const s = complete([
+      mkP("a", { initiativeCard: 1 }),
+      mkP("b", { initiativeCard: 2, lightningFast: true }),
+      mkP("c", { initiativeCard: 3, retainNext: true }),
+    ]);
+    const r = c.newRound(s, GM).state;
+    expect(r.participants[0].initiativeCard).not.toBeNull();
+    expect(r.participants[1].pendingCards).toHaveLength(2);
+    expect(r.participants[2].initiativeCard).toBe(3);
+    expect(new Set(r.drawnCards).size).toBe(4);
+    expect(r.drawnCards).toContain(3);
+  });
+
+  it("newRound with every card kept still starts drawing", () => {
+    const s = complete([mkP("a", { initiativeCard: 5, retainNext: true })]);
+    const r = c.newRound(s, GM).state;
+    expect(r.phase).toBe("DRAWING");
+    expect(r.drawnCards).toEqual([5]);
   });
 
   it("a kept card is never drawn again", () => {
@@ -489,7 +509,7 @@ describe("Keep card and newRound", () => {
       mkP("b", { initiativeCard: 2 }),
     ]);
     const r = c.newRound(s, GM).state;
-    expect(c.drawCard(r, { id: "b" }, GM).state.participants[1].initiativeCard).toBe(2);
+    expect(r.participants[1].initiativeCard).not.toBe(1);
   });
 
   it("a kept card above a shrunk deck stays reserved", () => {
@@ -499,7 +519,8 @@ describe("Keep card and newRound", () => {
     );
     const r = c.newRound(s, GM).state;
     expect(r.deckSize).toBe(13);
-    expect(r.drawnCards).toEqual([13]);
+    expect(r.drawnCards).toContain(13);
+    expect(r.participants[1].initiativeCard).not.toBe(13);
   });
 
   it("newRound recomputes deck size, is GM only and needs a finished round", () => {
