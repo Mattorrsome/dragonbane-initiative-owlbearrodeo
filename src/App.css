@@ -244,6 +244,12 @@ button:disabled {
   
 }
 
+/* Swap list open (participant rows hidden): scroll normally so every target is reachable
+   (a pinned panel taller than the popover would hide its top). */
+.action-buttons.sticky-actions.swapping {
+  position: static;
+}
+
 .app.dark .action-buttons.sticky-actions {
   background: #1a1a2e;
 }
@@ -405,7 +411,6 @@ button:disabled {
 .light .scroll-area::-webkit-scrollbar-thumb {
   background: rgba(98, 0, 238, 0.5);
 }
-
 /* Ferocity: rows from the same token share a thin border colour (--fer) */
 .participant-row.ferocity {
   box-shadow: inset 0 0 0 1px var(--fer);

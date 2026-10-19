@@ -419,7 +419,8 @@ function App() {
               })()}
             </div>
           )}
-          <div className="participant-list">
+          {/* Hidden while picking a swap target: the list of targets replaces it. */}
+          {!swapping && <div className="participant-list">
             {displayParticipants.map((p) => {
               const isActive = p.status === "ACTIVE" && combatState.phase === "ACTIVE";
               const canDraw =
@@ -620,11 +621,11 @@ function App() {
                 </div>
               );
             })}
-          </div>
+          </div>}
 
           {/* Active Turn Actions */}
           {combatState.phase === "ACTIVE" && currentParticipant && canControl(currentParticipant) && (
-            <div className={`action-buttons sticky-actions ${swapping ? 'stretchHeight' : ''}`}>
+            <div className={`action-buttons sticky-actions ${swapping ? "swapping" : ""}`}>
               {!swapping ? (
                 <>
                   <button className="btn-primary btn-full" onClick={act}>
