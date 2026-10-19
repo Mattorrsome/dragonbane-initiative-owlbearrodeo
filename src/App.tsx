@@ -680,14 +680,16 @@ function App() {
           {/* Phase-specific GM actions */}
           {isGM && combatState.phase === "DRAWING" && (
             <div className="action-buttons sticky-actions">
-              <button
-                className="btn-secondary btn-full"
-                onClick={drawAllCards}
-                disabled={allDrawn || surpriseOutstanding}
-                title={surpriseOutstanding ? "Waiting for surprise picks" : undefined}
-              >
-                Draw All Cards
-              </button>
+              {combatState.participants.some(combat.unheld) && (
+                <button
+                  className="btn-secondary btn-full"
+                  onClick={drawAllCards}
+                  disabled={surpriseOutstanding}
+                  title={surpriseOutstanding ? "Waiting for surprise picks" : undefined}
+                >
+                  Draw All Cards
+                </button>
+              )}
               <button className="btn-primary btn-full" onClick={startRound} disabled={!allDrawn}>
                 Start Round
               </button>

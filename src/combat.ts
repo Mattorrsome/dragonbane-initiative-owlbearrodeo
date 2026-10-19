@@ -380,7 +380,7 @@ export function drawAll(s: CombatState, ctx: Ctx): Result {
   return ok({ ...s, participants, drawnCards: drawn, lastDraw: null });
 }
 
-const unheld = (p: Participant): boolean => p.initiativeCard === null && !p.pendingCards;
+export const unheld = (p: Participant): boolean => p.initiativeCard === null && !p.pendingCards;
 
 export function setLightningFast(
   s: CombatState,
