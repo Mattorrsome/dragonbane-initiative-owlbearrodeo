@@ -39,6 +39,8 @@ function App() {
   const [takePlayerName, setTakePlayerName] = useState(() => localStorage.getItem(PLAYER_NAME_KEY) === "true");
 
   const combatRef = useRef(combatState);
+  // After this client's Act / Wait / Cancel: the turn key to move away from ("" = scroll now).
+  const scrollFrom = useRef<string | null>(null);
   useEffect(() => {
     combatRef.current = combatState;
   });
@@ -186,6 +188,13 @@ function App() {
   const canControl = (participant: Participant): boolean => combat.canControl(participant, ctx);
   const turnKey = `${combat.activeParticipant(combatState)?.id}|${combatState.phase}`;
   const swapping = swapKey === turnKey;
+  // Bring the active row into view once the turn has moved on (or the swap list closed).
+  useEffect(() => {
+    const from = scrollFrom.current;
+    if (from === null || swapping || (from !== "" && from === turnKey)) return;
+    scrollFrom.current = null;
+    document.querySelector(".participant-row.active")?.scrollIntoView({ block: "center" });
+  }, [turnKey, swapping]);
   const tableKey = `${combatState.phase}|${combatState.roundNumber}|${combatState.participants.length}`;
   const gmSwapFirst =
     gmSwapPick?.key === tableKey && combatState.participants.some((p) => p.id === gmSwapPick.id)
@@ -221,14 +230,21 @@ function App() {
 
   const drawAllCards = () => run((s, c) => combat.drawAll(s, c));
   const startRound = () => run((s, c) => combat.startRound(s, c));
-  const act = () => run((s, c) => combat.act(s, c));
+  const act = async () => {
+    scrollFrom.current = turnKey;
+    if (!(await run((s, c) => combat.act(s, c)))) scrollFrom.current = null;
+  };
   const newRound = () => run((s, c) => combat.newRound(s, c));
 
   const initiateSwap = () => setSwapKey(turnKey);
-  const cancelSwap = () => setSwapKey(null);
+  const cancelSwap = () => {
+    scrollFrom.current = "";
+    setSwapKey(null);
+  };
 
   const executeSwap = async (targetId: string) => {
-    await run((s, c) => combat.swap(s, { targetId }, c));
+    scrollFrom.current = turnKey;
+    if (!(await run((s, c) => combat.swap(s, { targetId }, c)))) scrollFrom.current = "";
     setSwapKey(null);
   };
 
