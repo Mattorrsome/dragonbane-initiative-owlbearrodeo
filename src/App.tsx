@@ -640,7 +640,7 @@ function App() {
           </div>}
 
           {/* Active Turn Actions */}
-          {combatState.phase === "ACTIVE" && currentParticipant && canControl(currentParticipant) && (
+          {combatState.phase === "ACTIVE" && currentParticipant && (canControl(currentParticipant) || combatState.anyPlayerCanEdit) && (
             <div className={`action-buttons sticky-actions ${swapping ? "swapping" : ""}`}>
               {!swapping ? (
                 <>

@@ -44,7 +44,7 @@ The Dragonbane initiative system uses a virtual deck of cards numbered 1 up to N
 
 The GM sees two checkboxes before starting combat. Both are remembered in the GM's browser for future combats.
 
-- **Players can Alter Any Token**: every player can toggle Lightning Fast, Surprise and Keep Card, draw cards, pick Surprise cards, choose Lightning Fast cards and use Parry/Evade for any participant. Act and Wait still belong to the token's owner or the GM. Off: only the GM and a token's owner can.
+- **Players can Alter Any Token**: every player can toggle Lightning Fast, Surprise and Keep Card, draw cards, pick Surprise cards, choose Lightning Fast cards, use Parry/Evade, and Act or Wait on any participant's turn. Off: only the GM and a token's owner can.
 - **Use Player Name**: rows show the token's name by default. Tick this to show the name of the player who controls the token instead. Falls back to the token's name for GM-created tokens or when that player isn't in the room. Also applies to Add Participants.
 
 ### Table Helpers

@@ -52,7 +52,7 @@ Combat rules live in `src/combat.ts` as pure reducers (`(state, args, ctx) => Re
 - Turn order: lowest card number acts first
 - Swap: exchange cards with someone who hasn't acted and has a higher number; swapper is marked "WAITED" and can no longer be a swap target
 - NPCs/monsters (controlledBy === "GM") can Wait and be Wait targets; the GM controls them
-- Parry/Evade: a non-active, unacted participant holding a card can spend their action out of turn (marked ACTED, turn skipped); GM, controller, or anyone with "Players can Alter Any Token"
+- Parry/Evade: a non-active, unacted participant holding a card can spend their action out of turn (marked ACTED, turn skipped); GM, controller, or anyone with "Players can Alter Any Token" (same for Act and Wait)
 - Names: token name by default; GM's "Use Player Name" checkbox (localStorage) uses the controlling player's name instead
 - Ferocity: GM can duplicate a participant entry during drawing phase for monsters with multiple turns
 

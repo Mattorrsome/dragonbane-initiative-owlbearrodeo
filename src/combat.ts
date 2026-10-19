@@ -258,7 +258,7 @@ export function act(s: CombatState, ctx: Ctx): Result {
   if (s.phase !== "ACTIVE") return reject(s, "No round in progress");
   const cur = activeParticipant(s);
   if (!cur) return reject(s, "No active participant");
-  if (!canControl(cur, ctx)) return reject(s, "It isn't your turn");
+  if (!canEdit(s, cur, ctx)) return reject(s, "It isn't your turn");
   return ok(settle(mapP(s, cur.id, (p) => ({ ...p, status: "ACTED" as const }))));
 }
 
@@ -279,7 +279,7 @@ export function swap(s: CombatState, a: { targetId: string }, ctx: Ctx): Result 
   if (s.phase !== "ACTIVE") return reject(s, "No round in progress");
   const cur = activeParticipant(s);
   if (!cur) return reject(s, "No active participant");
-  if (!canControl(cur, ctx)) return reject(s, "It isn't your turn");
+  if (!canEdit(s, cur, ctx)) return reject(s, "It isn't your turn");
   const target = validSwapTargets(s).find((p) => p.id === a.targetId);
   if (!target) return reject(s, "That participant can't be swapped with");
   return ok(

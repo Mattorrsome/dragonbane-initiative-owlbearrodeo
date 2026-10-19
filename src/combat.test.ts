@@ -442,6 +442,18 @@ describe("Players can Alter Any Token", () => {
     expect(c.setRetainNext(on, { id: "b", value: true }, P1).state.participants[0].retainNext).toBe(true);
   });
 
+  it("lets players Act and Wait on any participant's turn", () => {
+    const off = mkS(
+      [mkP("a", { initiativeCard: 1, status: "ACTIVE" }), mkP("b", { initiativeCard: 2 })],
+      { phase: "ACTIVE" }
+    );
+    const on = { ...off, anyPlayerCanEdit: true };
+    expect(c.act(off, P1).error).toBeDefined();
+    expect(c.swap(off, { targetId: "b" }, P1).error).toBeDefined();
+    expect(c.act(on, P1).state.participants[0].status).toBe("ACTED");
+    expect(c.swap(on, { targetId: "b" }, P1).state.participants[0].status).toBe("WAITED");
+  });
+
   it("lets players draw, pick Surprise and choose Lightning Fast cards for any token", () => {
     const off = mkS([mkP("b"), mkP("s", { surprise: true }), mkP("l", { pendingCards: [2, 5] })]);
     const on = { ...off, anyPlayerCanEdit: true };
