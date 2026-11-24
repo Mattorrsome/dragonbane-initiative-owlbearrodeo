@@ -12,24 +12,32 @@ const RING_COLOR = "#ffca28";
  */
 async function startTurnRing() {
   let role = await OBR.player.getRole();
-  let tokenId: string | null = null; // active participant's token, from room metadata
-  let drawn = ""; // what the current ring represents ("" = no ring)
+  let tokenIds: string[] = []; // active participant's tokens (a group has several), from room metadata
+  let drawn = ""; // what the current rings represent ("" = no ring)
+  let ringIds: string[] = [];
   let queue: Promise<unknown> = Promise.resolve();
 
   const draw = async (items?: Item[]) => {
-    const want = tokenId && (await OBR.scene.isReady()) ? tokenId : null;
-    const token = want ? (items ?? (await OBR.scene.items.getItems([want]))).find((i) => i.id === want) : undefined;
+    const want = tokenIds.length && (await OBR.scene.isReady()) ? tokenIds : [];
+    const pool = want.length ? (items ?? (await OBR.scene.items.getItems(want))) : [];
     // Never reveal a token the GM has hidden from players.
-    const show = token && (token.visible || role === "GM");
-    const key = show ? `${token.id}|${token.scale.x}|${token.scale.y}` : "";
+    const tokens = pool.filter((i) => want.includes(i.id) && (i.visible || role === "GM"));
+    const key = tokens.map((t) => `${t.id}|${t.scale.x}|${t.scale.y}`).join(",");
     if (key === drawn) return;
-    if (drawn) await OBR.scene.local.deleteItems([RING_ID]).catch(() => {});
+    if (ringIds.length) await OBR.scene.local.deleteItems(ringIds).catch(() => {});
     drawn = "";
-    if (!show) return;
+    ringIds = [];
+    if (!tokens.length) return;
+    const rings = await Promise.all(tokens.map(ringFor));
+    await OBR.scene.local.addItems(rings);
+    ringIds = rings.map((r) => r.id);
+    drawn = key;
+  };
+  const ringFor = async (token: Item) => {
     const b = await OBR.scene.items.getItemBounds([token.id]);
     const size = Math.max(b.width, b.height) * 1.2;
-    const ring = buildShape()
-      .id(RING_ID)
+    return buildShape()
+      .id(`${RING_ID}/${token.id}`)
       .shapeType("CIRCLE")
       .width(size)
       .height(size)
@@ -44,8 +52,6 @@ async function startTurnRing() {
       .locked(true)
       .disableHit(true)
       .build();
-    await OBR.scene.local.addItems([ring]);
-    drawn = key;
   };
   // Serialize: metadata, item and scene events can arrive together.
   const redraw = (items?: Item[]) => {
@@ -54,7 +60,7 @@ async function startTurnRing() {
 
   const fromMetadata = (m: Record<string, unknown>) => {
     const s = normalizeState(m[METADATA_KEY]);
-    tokenId = (s.isActive && s.phase === "ACTIVE" && activeParticipant(s)?.tokenId) || null;
+    tokenIds = (s.isActive && s.phase === "ACTIVE" && activeParticipant(s)?.tokenIds) || [];
   };
   fromMetadata(await OBR.room.getMetadata());
   redraw();
@@ -68,6 +74,7 @@ async function startTurnRing() {
   // Local items vanish with the scene; draw again once the new one is ready.
   OBR.scene.onReadyChange(() => {
     drawn = "";
+    ringIds = [];
     redraw();
   });
   OBR.player.onChange((p) => {

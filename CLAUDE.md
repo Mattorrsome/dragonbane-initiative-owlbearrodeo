@@ -54,6 +54,9 @@ Combat rules live in `src/combat.ts` as pure reducers (`(state, args, ctx) => Re
 - NPCs/monsters (controlledBy === "GM") can Wait and be Wait targets; the GM controls them
 - Parry/Evade: a non-active, unacted participant holding a card can spend their action out of turn (marked ACTED, turn skipped); GM, controller, or anyone with "Players can Alter Any Token" (same for Act and Wait)
 - Names: token name by default; GM's "Use Player Name" checkbox (localStorage) uses the controlling player's name instead
+- End Round (GM, footer, ACTIVE phase): ends the round as if everyone acted and deals the next one (`endRound` = `newRound` from ROUND_COMPLETE)
+- Only Character/Mount layer items join combat (`isToken`); drawings, props, text are skipped
+- Group Identical Monsters (GM checkbox, localStorage): GM tokens with same name + image share one row (`Participant.tokenIds`), one card, one turn; player tokens never grouped. Deleting a token drops it from its row; the row leaves when its last token goes
 - Ferocity: GM can duplicate a participant entry during drawing phase for monsters with multiple turns
 
 ## Deployment

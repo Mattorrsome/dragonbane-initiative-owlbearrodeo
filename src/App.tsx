@@ -9,6 +9,7 @@ type Theme = "DARK" | "LIGHT";
 
 const ANY_EDIT_KEY = "com.dragonbane-initiative/any-player-can-edit";
 const PLAYER_NAME_KEY = "com.dragonbane-initiative/take-player-name";
+const GROUP_NPCS_KEY = "com.dragonbane-initiative/group-npcs";
 
 type Variant = Parameters<typeof OBR.notification.show>[1];
 
@@ -29,7 +30,10 @@ function App() {
   // Swap pickers remember the table they were opened on; any turn/phase change closes them.
   const [swapKey, setSwapKey] = useState<string | null>(null);
   const [gmSwapPick, setGmSwapPick] = useState<{ id: string; key: string } | null>(null);
+  // Players who can own tokens. GM connections (incl. this GM's other tabs, which share its
+  // player id) never do, so GM tokens stay NPCs and can be grouped.
   const [partyPlayers, setPartyPlayers] = useState<Player[]>([]);
+  const setParty = (ps: Player[]) => setPartyPlayers(ps.filter((p) => p.role === "PLAYER"));
   const [selectionCount, setSelectionCount] = useState(0);
   const [editingNameId, setEditingNameId] = useState<string | null>(null);
   const [editingNameValue, setEditingNameValue] = useState("");
@@ -37,6 +41,8 @@ function App() {
   const [anyPlayerCanEdit, setAnyPlayerCanEdit] = useState(() => localStorage.getItem(ANY_EDIT_KEY) === "true");
   // GM preference, remembered per browser; names rows at start and on Add Participants.
   const [takePlayerName, setTakePlayerName] = useState(() => localStorage.getItem(PLAYER_NAME_KEY) === "true");
+  // GM preference, remembered per browser; groups identical monsters at start and on Add Participants.
+  const [groupNpcs, setGroupNpcs] = useState(() => localStorage.getItem(GROUP_NPCS_KEY) === "true");
 
   const combatRef = useRef(combatState);
   // After this client's Act / Wait / Cancel: the turn key to move away from ("" = scroll now).
@@ -85,7 +91,7 @@ function App() {
       setRole(playerRole);
       setPlayerId(id);
       setTheme(currentTheme.mode);
-      setPartyPlayers(players);
+      setParty(players);
       setIsReady(true);
 
       const metadata = await OBR.room.getMetadata();
@@ -93,11 +99,20 @@ function App() {
     });
   }, []);
 
-  // Track the local player's token selection (initial value + live updates).
+  // Selected tokens (each token of a group counts; drawings, props etc. don't), live.
   useEffect(() => {
     if (!isReady) return;
-    OBR.player.getSelection().then((sel) => setSelectionCount(sel?.length ?? 0)).catch(console.error);
-    return OBR.player.onChange((p) => setSelectionCount(p.selection?.length ?? 0));
+    let live = true;
+    const count = async (sel?: string[]) => {
+      const items = sel?.length ? await OBR.scene.items.getItems(sel) : [];
+      if (live) setSelectionCount(items.filter(combat.isToken).length);
+    };
+    OBR.player.getSelection().then(count).catch(console.error);
+    const unsub = OBR.player.onChange((p) => count(p.selection).catch(console.error));
+    return () => {
+      live = false;
+      unsub();
+    };
   }, [isReady]);
 
   // Subscribe to metadata changes
@@ -113,7 +128,7 @@ function App() {
       setCombatState(next);
     });
     const unsubTheme = OBR.theme.onChange((t) => setTheme(t.mode));
-    const unsubParty = OBR.party.onChange((p) => setPartyPlayers(p));
+    const unsubParty = OBR.party.onChange(setParty);
 
     return () => {
       unsubMetadata();
@@ -171,9 +186,7 @@ function App() {
       if (gone.length === 0 || swap) return;
       queue = queue
         .then(() =>
-          dispatch((s) =>
-            combat.removeParticipants(s, { ids: combat.participantIdsForTokens(s, gone) }, gmCtx)
-          )
+          dispatch((s) => combat.removeTokens(s, { tokenIds: gone }, gmCtx))
         )
         .catch(console.error);
     });
@@ -208,15 +221,22 @@ function App() {
     setEditingNameId(null);
   };
 
-  const startCombat = async () => {
+  // Rows for the selected tokens; drawings, props and other non-token items are skipped.
+  const selectedParticipants = async () => {
     const selection = await OBR.player.getSelection();
-    if (!selection || selection.length === 0) {
-      await notify("Select tokens to add to combat", "WARNING");
-      return;
+    const items = selection?.length ? await OBR.scene.items.getItems(selection) : [];
+    const tokens = items.filter(combat.isToken);
+    if (tokens.length === 0) {
+      await notify("Select tokens to add", "WARNING");
+      return null;
     }
-    const items = await OBR.scene.items.getItems(selection);
-    const participants = combat.buildParticipants(items, partyPlayers, takePlayerName);
-    if (await run((s, c) => combat.startCombat(s, { participants, anyPlayerCanEdit }, c)))
+    if (tokens.length < items.length) await notify(`Skipped ${items.length - tokens.length} non-token item(s)`);
+    return combat.buildParticipants(tokens, partyPlayers, takePlayerName, groupNpcs);
+  };
+
+  const startCombat = async () => {
+    const participants = await selectedParticipants();
+    if (participants && await run((s, c) => combat.startCombat(s, { participants, anyPlayerCanEdit }, c)))
       await OBR.player.deselect();
   };
 
@@ -235,6 +255,7 @@ function App() {
     if (!(await run((s, c) => combat.act(s, c)))) scrollFrom.current = null;
   };
   const newRound = () => run((s, c) => combat.newRound(s, c));
+  const endRound = () => run((s, c) => combat.endRound(s, c));
 
   const initiateSwap = () => setSwapKey(turnKey);
   const cancelSwap = () => {
@@ -253,21 +274,14 @@ function App() {
       combat.addFerocity(s, { id: participantId, newId: crypto.randomUUID() }, c)
     );
 
-  // Removes every row of the token, so Ferocity duplicates go with it.
-  const removeToken = (tokenId: string) =>
-    run((s, c) => combat.removeParticipants(s, { ids: combat.participantIdsForTokens(s, [tokenId]) }, c));
+  // Removes every row of these tokens, so Ferocity duplicates go with it.
+  const removeTokens = (tokenIds: string[]) => run((s, c) => combat.removeTokens(s, { tokenIds }, c));
 
   const endCombat = () => run((s, c) => combat.endCombat(s, c));
 
   const addParticipants = async () => {
-    const selection = await OBR.player.getSelection();
-    if (!selection || selection.length === 0) {
-      await notify("Select tokens to add", "WARNING");
-      return;
-    }
-    const items = await OBR.scene.items.getItems(selection);
-    const participants = combat.buildParticipants(items, partyPlayers, takePlayerName);
-    await run((s, c) => combat.addParticipants(s, { participants }, c));
+    const participants = await selectedParticipants();
+    if (participants) await run((s, c) => combat.addParticipants(s, { participants }, c));
   };
 
   const setLightningFast = (id: string, value: boolean) =>
@@ -336,7 +350,7 @@ function App() {
   {
     const byToken = new Map<string, string[]>();
     for (const p of displayParticipants)
-      byToken.set(p.tokenId, [...(byToken.get(p.tokenId) ?? []), p.id]);
+      byToken.set(p.tokenIds.join(), [...(byToken.get(p.tokenIds.join()) ?? []), p.id]);
     let color = 0;
     for (const ids of byToken.values()) {
       if (ids.length < 2) continue;
@@ -352,12 +366,12 @@ function App() {
     for (const p of combatState.participants) {
       const n = combat.displayName(p);
       const t = tokensByName.get(n) ?? [];
-      if (!t.includes(p.tokenId)) tokensByName.set(n, [...t, p.tokenId]);
+      if (!t.includes(p.tokenIds.join())) tokensByName.set(n, [...t, p.tokenIds.join()]);
     }
     const dupes = new Map<string, number>();
     for (const [n, t] of tokensByName) if (t.length > 1) t.forEach((tok, i) => dupes.set(`${n}|${tok}`, i + 1));
     for (const p of combatState.participants) {
-      const k = `${combat.displayName(p)}|${p.tokenId}`;
+      const k = `${combat.displayName(p)}|${p.tokenIds.join()}`;
       if (dupes.has(k)) sameName.set(p.id, dupes.get(k)!);
     }
   }
@@ -406,6 +420,20 @@ function App() {
                   }}
                 />
                 Use Player Name
+              </label>
+              <label
+                className="toggle"
+                title="When checked, GM tokens with the same name and image share one row: one card and one turn for the whole group. Player tokens are never grouped. Applies when starting combat and on Add Participants. Remembered on this browser for future combats."
+              >
+                <input
+                  type="checkbox"
+                  checked={groupNpcs}
+                  onChange={(e) => {
+                    setGroupNpcs(e.target.checked);
+                    localStorage.setItem(GROUP_NPCS_KEY, String(e.target.checked));
+                  }}
+                />
+                Group Identical Monsters
               </label>
             </div>
           )}
@@ -497,6 +525,7 @@ function App() {
                       >
                         {combat.displayName(p)}
                         {sameName.has(p.id) && ` #${sameName.get(p.id)}`}
+                        {p.tokenIds.length > 1 && ` ×${p.tokenIds.length}`}
                         {fer && ` - Action ${fer.n}`}
                       </div>
                     )}
@@ -627,7 +656,7 @@ function App() {
                     {isGM && (
                       <button
                         className="btn-danger btn-small"
-                        onClick={() => removeToken(p.tokenId)}
+                        onClick={() => removeTokens(p.tokenIds)}
                         title={fer ? "Remove (all Ferocity actions)" : "Remove"}
                       >
                         ✕
@@ -721,6 +750,15 @@ function App() {
               {isGM && (
                 <button className="btn-danger" onClick={endCombat}>
                   End Combat
+                </button>
+              )}
+              {isGM && combatState.phase === "ACTIVE" && (
+                <button
+                  className="btn-secondary push-right"
+                  onClick={endRound}
+                  title="End this round now as if everyone has acted, and deal the next round"
+                >
+                  End Round
                 </button>
               )}
             </div>

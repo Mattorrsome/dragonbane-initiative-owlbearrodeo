@@ -121,7 +121,11 @@ export const withDefaults = (p: Partial<Participant>): Participant =>
 export function normalizeState(raw: unknown): CombatState {
   if (!raw || typeof raw !== "object") return INITIAL_COMBAT_STATE;
   const s = raw as Partial<CombatState>;
-  const participants = (s.participants ?? []).map(withDefaults);
+  // Before 2.6 a row held a single `tokenId`.
+  const participants = (s.participants ?? []).map((p) => {
+    const { tokenId, ...rest } = p as Partial<Participant> & { tokenId?: string };
+    return withDefaults({ tokenIds: tokenId ? [tokenId] : [], ...rest });
+  });
   return settle({
     ...INITIAL_COMBAT_STATE,
     ...s,
@@ -135,20 +139,37 @@ export interface TokenInfo {
   id: string;
   name: string;
   createdUserId: string;
+  layer: string;
+  image?: { url: string };
 }
 
-/** Shared by start combat and add participants. */
+/** Only Character and Mount layer items join combat (not drawings, props, text...). */
+export const isToken = (item: { layer: string }): boolean =>
+  item.layer === "CHARACTER" || item.layer === "MOUNT";
+
+/**
+ * Shared by start combat and add participants. With `groupNpcs`, GM tokens with the same
+ * name and image share one row (one card, one turn); player tokens are never grouped.
+ */
 export function buildParticipants(
   items: TokenInfo[],
   players: { id: string; name: string }[],
   takePlayerName = false,
+  groupNpcs = false,
   newId: () => string = () => crypto.randomUUID()
 ): Participant[] {
-  return items.map((item) => {
-    const owner = players.find((pl) => pl.id === item.createdUserId);
+  const ownerOf = (item: TokenInfo) => players.find((pl) => pl.id === item.createdUserId);
+  const groups = new Map<string, TokenInfo[]>();
+  for (const item of items) {
+    const key = groupNpcs && !ownerOf(item) ? `npc|${item.name}|${item.image?.url}` : `id|${item.id}`;
+    groups.set(key, [...(groups.get(key) ?? []), item]);
+  }
+  return [...groups.values()].map((group) => {
+    const item = group[0];
+    const owner = ownerOf(item);
     return withDefaults({
       id: newId(),
-      tokenId: item.id,
+      tokenIds: group.map((i) => i.id),
       name: (takePlayerName && owner?.name) || item.name || "Unknown",
       controlledBy: owner ? owner.id : "GM",
     });
@@ -197,8 +218,10 @@ export function addParticipants(
   const denied = gmOnly(s, ctx, "add participants");
   if (denied) return denied;
   if (s.phase !== "DRAWING") return reject(s, "Participants can only be added while drawing");
-  const known = new Set(s.participants.map((p) => p.tokenId));
-  const fresh = a.participants.filter((p) => !known.has(p.tokenId));
+  const known = new Set(s.participants.flatMap((p) => p.tokenIds));
+  const fresh = a.participants
+    .map((p) => ({ ...p, tokenIds: p.tokenIds.filter((t) => !known.has(t)) }))
+    .filter((p) => p.tokenIds.length > 0);
   if (fresh.length === 0) return reject(s, "Selected tokens are already in combat");
   if (s.participants.length + fresh.length > MAX_PARTICIPANTS)
     return reject(s, `At most ${MAX_PARTICIPANTS} participants`);
@@ -221,7 +244,7 @@ export function addFerocity(s: CombatState, a: { id: string; newId: string }, ct
     ...s.participants,
     withDefaults({
       id: a.newId,
-      tokenId: p.tokenId,
+      tokenIds: p.tokenIds,
       name: p.name,
       customName: p.customName,
       controlledBy: p.controlledBy,
@@ -310,9 +333,19 @@ export function removeParticipants(s: CombatState, a: { ids: string[] }, ctx: Ct
   return ok(next, `${[...new Set(gone.map(displayName))].join(", ")} removed from combat`);
 }
 
-/** Every participant entry (incl. Ferocity duplicates) backed by one of these tokens. */
-export const participantIdsForTokens = (s: CombatState, tokenIds: string[]): string[] =>
-  s.participants.filter((p) => tokenIds.includes(p.tokenId)).map((p) => p.id);
+/**
+ * Drop these tokens from every row (incl. Ferocity duplicates). A row left with no tokens
+ * leaves combat; a group that still has some keeps its card and turn.
+ */
+export function removeTokens(s: CombatState, a: { tokenIds: string[] }, ctx: Ctx): Result {
+  const denied = gmOnly(s, ctx, "remove participants");
+  if (denied) return denied;
+  const gone = new Set(a.tokenIds);
+  if (!s.participants.some((p) => p.tokenIds.some((t) => gone.has(t)))) return ok(s);
+  const participants = s.participants.map((p) => ({ ...p, tokenIds: p.tokenIds.filter((t) => !gone.has(t)) }));
+  const ids = participants.filter((p) => p.tokenIds.length === 0).map((p) => p.id);
+  return removeParticipants({ ...s, participants }, { ids }, ctx);
+}
 
 /** True while a Surprise participant still has to pick a card. */
 export const waitingOnSurprise = (s: CombatState): boolean =>
@@ -499,6 +532,15 @@ export function newRound(s: CombatState, ctx: Ctx): Result {
   const dealt = drawAll(next, ctx);
   return ok(dealt.error ? next : dealt.state);
 }
+
+/** GM cuts the round short: treat everyone as acted and deal the next round. */
+export function endRound(s: CombatState, ctx: Ctx): Result {
+  const denied = gmOnly(s, ctx, "end the round");
+  if (denied) return denied;
+  if (s.phase !== "ACTIVE") return reject(s, "No round in progress");
+  return newRound({ ...s, phase: "ROUND_COMPLETE" }, ctx);
+}
+
 export function gmSwapCards(
   s: CombatState,
   a: { first: string; second: string },

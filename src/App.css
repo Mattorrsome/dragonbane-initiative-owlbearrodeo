@@ -271,6 +271,10 @@ button:disabled {
   gap: 8px;
 }
 
+.push-right {
+  margin-left: auto;
+}
+
 /* Swap Target Selection */
 .swap-targets {
   margin-top: 8px;

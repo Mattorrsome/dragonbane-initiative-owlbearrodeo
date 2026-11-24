@@ -132,6 +132,8 @@ Players can:
 #### Participant List
 Each row displays:
 - Token name (as shown on the map) by default; with "Use Player Name" ticked before combat (GM, remembered per browser), the name of the player who controls the token, falling back to the token name for GM tokens or players not in the room. Also applies to Add Participants. GM rename overrides either.
+- Only Character and Mount layer items can join combat; other selected items (drawings, props, text) are skipped with a notice.
+- "Group Identical Monsters" (GM, remembered per browser): GM tokens with the same name and image share one row, one card and one turn. Player tokens are never grouped. Removing one token of a group keeps the row until its last token is gone.
 - Initiative card icon with number (or placeholder if not yet drawn)
 - Status badge:
   - "Draw" button (during draw phase, for controlling player)

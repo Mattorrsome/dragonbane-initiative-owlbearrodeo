@@ -4,7 +4,7 @@ export type ParticipantStatus = "PENDING" | "ACTIVE" | "ACTED" | "WAITED";
 
 export interface Participant {
   id: string;
-  tokenId: string;
+  tokenIds: string[]; // several when identical monsters share one card
   name: string;
   customName: string | null;
   initiativeCard: number | null;

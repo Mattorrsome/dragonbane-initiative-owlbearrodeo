@@ -17,7 +17,7 @@ function deepFreeze<T>(o: T): T {
 export function mkP(id: string, over: Partial<Participant> = {}): Participant {
   return {
     id,
-    tokenId: "t-" + id,
+    tokenIds: ["t-" + id],
     name: id,
     customName: null,
     initiativeCard: null,
@@ -81,6 +81,7 @@ describe("normalizeState", () => {
       retainNext: false,
       pendingCards: null,
       initiativeCard: 3,
+      tokenIds: ["t"],
     });
   });
 });
@@ -101,28 +102,57 @@ describe("setup reducers", () => {
   it("buildParticipants resolves player ownership and uses token names by default", () => {
     const ps = c.buildParticipants(
       [
-        { id: "t1", name: "Token", createdUserId: "p1" },
-        { id: "t2", name: "", createdUserId: "unknown" },
+        { id: "t1", name: "Token", createdUserId: "p1", layer: "CHARACTER" },
+        { id: "t2", name: "", createdUserId: "unknown", layer: "CHARACTER" },
       ],
       [{ id: "p1", name: "Alice" }],
       false,
+      false,
       counter()
     );
-    expect(ps[0]).toMatchObject({ id: "id1", tokenId: "t1", name: "Token", controlledBy: "p1" });
+    expect(ps[0]).toMatchObject({ id: "id1", tokenIds: ["t1"], name: "Token", controlledBy: "p1" });
     expect(ps[1]).toMatchObject({ name: "Unknown", controlledBy: "GM", lightningFast: false });
   });
 
   it("buildParticipants takes the controlling player's name when asked", () => {
     const ps = c.buildParticipants(
       [
-        { id: "t1", name: "Token", createdUserId: "p1" },
-        { id: "t2", name: "Goblin", createdUserId: "gm" },
+        { id: "t1", name: "Token", createdUserId: "p1", layer: "CHARACTER" },
+        { id: "t2", name: "Goblin", createdUserId: "gm", layer: "CHARACTER" },
       ],
       [{ id: "p1", name: "Alice" }],
       true,
+      false,
       counter()
     );
     expect(ps.map((p) => p.name)).toEqual(["Alice", "Goblin"]);
+  });
+
+  it("buildParticipants groups GM tokens with the same name and image, never player tokens", () => {
+    const tok = (id: string, name: string, url: string, createdUserId = "gm") =>
+      ({ id, name, createdUserId, layer: "CHARACTER", image: { url } });
+    const items = [
+      tok("g1", "Goblin", "gob.png"),
+      tok("p1", "Hero", "hero.png", "p1"),
+      tok("g2", "Goblin", "gob.png"),
+      tok("g3", "Goblin", "archer.png"),
+      tok("p2", "Hero", "hero.png", "p1"),
+    ];
+    const players = [{ id: "p1", name: "Alice" }];
+    const grouped = c.buildParticipants(items, players, false, true, counter());
+    expect(grouped.map((p) => p.tokenIds)).toEqual([["g1", "g2"], ["p1"], ["g3"], ["p2"]]);
+    expect(c.buildParticipants(items, players, false, false, counter())).toHaveLength(5);
+  });
+
+  it("isToken accepts only Character and Mount layer items", () => {
+    expect(["CHARACTER", "MOUNT", "DRAWING", "PROP", "TEXT", "MAP"].filter((layer) => c.isToken({ layer })))
+      .toEqual(["CHARACTER", "MOUNT"]);
+  });
+
+  it("addParticipants adds only the new tokens of a group", () => {
+    const s = mkS([mkP("a")]);
+    const r = c.addParticipants(s, { participants: [mkP("g", { tokenIds: ["t-a", "t-new"] })] }, GM);
+    expect(r.state.participants[1].tokenIds).toEqual(["t-new"]);
   });
 
   it("startCombat is GM only and sets deck size", () => {
@@ -141,7 +171,7 @@ describe("setup reducers", () => {
 
   it("addParticipants grows the deck, skips known tokens, caps at 20", () => {
     const s = mkS(Array.from({ length: 10 }, (_, i) => mkP("p" + i)));
-    const r = c.addParticipants(s, { participants: [mkP("n1"), mkP("n2"), mkP("p0x", { tokenId: "t-p0" })] }, GM);
+    const r = c.addParticipants(s, { participants: [mkP("n1"), mkP("n2"), mkP("p0x", { tokenIds: ["t-p0"] })] }, GM);
     expect(r.state.participants).toHaveLength(12);
     expect(r.state.deckSize).toBe(12);
     const full = mkS(Array.from({ length: 20 }, (_, i) => mkP("p" + i)));
@@ -152,7 +182,7 @@ describe("setup reducers", () => {
 
   it("addParticipants reports tokens already in combat", () => {
     const s = mkS([mkP("a")]);
-    const r = c.addParticipants(s, { participants: [mkP("a2", { tokenId: "t-a" })] }, GM);
+    const r = c.addParticipants(s, { participants: [mkP("a2", { tokenIds: ["t-a"] })] }, GM);
     expect(r.error).toMatch(/already/i);
   });
 
@@ -160,7 +190,7 @@ describe("setup reducers", () => {
     const s = mkS([mkP("a", { customName: "Troll" })]);
     const r = c.addFerocity(s, { id: "a", newId: "a2" }, GM);
     expect(r.state.participants[1]).toMatchObject({
-      id: "a2", tokenId: "t-a", customName: "Troll", initiativeCard: null,
+      id: "a2", tokenIds: ["t-a"], customName: "Troll", initiativeCard: null,
     });
     const full = mkS(Array.from({ length: 20 }, (_, i) => mkP("p" + i)));
     expect(c.addFerocity(full, { id: "p0", newId: "x" }, GM).state).toBe(full);
@@ -272,9 +302,21 @@ describe("turn flow", () => {
     expect(c.removeParticipants(s, { ids: ["zzz"] }, GM).state).toBe(s);
   });
 
-  it("participantIdsForTokens returns every Ferocity duplicate of a token", () => {
-    const s = mkS([mkP("a", { tokenId: "t" }), mkP("a2", { tokenId: "t" }), mkP("b")]);
-    expect(c.participantIdsForTokens(s, ["t"])).toEqual(["a", "a2"]);
+  it("removeTokens removes every Ferocity duplicate of a token", () => {
+    const s = mkS([mkP("a", { tokenIds: ["t"] }), mkP("a2", { tokenIds: ["t"] }), mkP("b")]);
+    expect(c.removeTokens(s, { tokenIds: ["t"] }, GM).state.participants.map((p) => p.id)).toEqual(["b"]);
+    expect(c.removeTokens(s, { tokenIds: ["zzz"] }, GM).state).toBe(s);
+    expect(c.removeTokens(s, { tokenIds: ["t"] }, P1).state).toBe(s);
+  });
+
+  it("removeTokens keeps a group (and its card) until its last token goes", () => {
+    const s = mkS([mkP("g", { tokenIds: ["g1", "g2"], initiativeCard: 4 })], { drawnCards: [4] });
+    const one = c.removeTokens(s, { tokenIds: ["g1"] }, GM).state;
+    expect(one.participants[0]).toMatchObject({ tokenIds: ["g2"], initiativeCard: 4 });
+    expect(one.drawnCards).toEqual([4]);
+    const all = c.removeTokens(one, { tokenIds: ["g2"] }, GM).state;
+    expect(all.participants).toHaveLength(0);
+    expect(all.drawnCards).toEqual([]);
   });
 });
 
@@ -468,6 +510,22 @@ describe("Players can Alter Any Token", () => {
   it("startCombat stores the flag", () => {
     const s = c.startCombat(INITIAL_COMBAT_STATE, { participants: [mkP("a")], anyPlayerCanEdit: true }, GM).state;
     expect(s.anyPlayerCanEdit).toBe(true);
+  });
+});
+
+describe("endRound", () => {
+  it("skips everyone left and deals the next round, keeping Veteran cards", () => {
+    const s = mkRound([3, 1, 2], [{ retainNext: true }]);
+    const r = c.endRound(s, GM).state;
+    expect(r).toMatchObject({ phase: "DRAWING", roundNumber: s.roundNumber + 1 });
+    expect(r.participants.every((p) => p.status === "PENDING" && p.initiativeCard !== null)).toBe(true);
+    expect(r.participants[0].initiativeCard).toBe(3);
+  });
+
+  it("is GM only and needs an active round", () => {
+    const s = mkRound([1, 2]);
+    expect(c.endRound(s, P1).state).toBe(s);
+    expect(c.endRound(mkS([mkP("a")]), GM).error).toBeDefined();
   });
 });
 

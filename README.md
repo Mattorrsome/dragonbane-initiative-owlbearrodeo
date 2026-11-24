@@ -46,6 +46,9 @@ The GM sees two checkboxes before starting combat. Both are remembered in the GM
 
 - **Players can Alter Any Token**: every player can toggle Lightning Fast, Surprise and Keep Card, draw cards, pick Surprise cards, choose Lightning Fast cards, use Parry/Evade, and Act or Wait on any participant's turn. Off: only the GM and a token's owner can.
 - **Use Player Name**: rows show the token's name by default. Tick this to show the name of the player who controls the token instead. Falls back to the token's name for GM-created tokens or when that player isn't in the room. Also applies to Add Participants.
+- **Group Identical Monsters**: GM tokens with the same name and image share one row (e.g. "Goblin ×3"): one card and one turn for the whole group, and every token in it gets the turn ring. Player tokens are never grouped. Also applies to Add Participants. Deleting one token of a group keeps the row until the last one goes.
+
+Only tokens (Character and Mount layer items) join combat. Selected drawings, props and text are skipped.
 
 ### Table Helpers
 
@@ -83,6 +86,8 @@ The GM sees two checkboxes before starting combat. Both are remembered in the GM
 
 #### Round Completion
 When all participants have acted, click **"Draw New Round"**: cards are dealt to everyone automatically (Lightning Fast still picks one of two), then click **"Start Round"**. Anyone with **Keep Card** ticked keeps their card.
+
+The GM can also click **"End Round"** (bottom right, while a round is active) to end the round immediately as if everyone has acted and deal the next round.
 
 #### Ferocity (Multiple Turns)
 Some monsters have the Ferocity ability, allowing them to take multiple turns per round. To handle this:
@@ -235,7 +240,7 @@ Users install by adding your hosted manifest URL. The host must send `Access-Con
 
 ### Data Storage
 
-Combat state is stored in Room Metadata under the key `com.dragonbane-initiative/combat-state`. This persists across page refreshes and scene changes. The GM's "Players can Alter Any Token" and "Use Player Name" choices are kept in that browser's `localStorage`.
+Combat state is stored in Room Metadata under the key `com.dragonbane-initiative/combat-state`. This persists across page refreshes and scene changes. The GM's "Players can Alter Any Token", "Use Player Name" and "Group Identical Monsters" choices are kept in that browser's `localStorage`.
 
 ## Disclaimer
 
